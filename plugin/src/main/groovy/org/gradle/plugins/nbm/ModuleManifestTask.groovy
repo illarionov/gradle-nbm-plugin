@@ -31,11 +31,28 @@ class ModuleManifestTask extends ConventionTask {
             return false
         }
 
-        def output = new ByteArrayOutputStream(4096)
-        getManifest().write(output)
+        Manifest oldMf = new Manifest(new ByteArrayInputStream(actualBytes));
+        Manifest mf = createManifest()
 
-        byte[] expectedBytes = output.toByteArray()
-        return Arrays.equals(actualBytes, expectedBytes)
+        Attributes oldAttribs = oldMf.getMainAttributes()
+        Attributes mfAttribs = mf.getMainAttributes()
+
+        // Remove dynamic (time) related content
+        // TODO Ensure values are conform to SimpleDateFormat of NbmPluginExtension.buildDate
+        def attrImplVersion = new Attributes.Name('OpenIDE-Module-Implementation-Version')
+        def attrBuildVersion = new Attributes.Name('OpenIDE-Module-Build-Version')
+        if (oldAttribs.containsKey(attrBuildVersion) && mfAttribs.containsKey(attrBuildVersion)) {
+            logger.debug "UP-TO-DATE check - exclude dynamic manifest values: build version found ->  assume dynamic build version (time stamp) -> include implementation version in check (exclude build version)"
+            oldAttribs.remove(attrBuildVersion)
+            mfAttribs.remove(attrBuildVersion)
+        } else if (!oldAttribs.containsKey(attrBuildVersion) && !mfAttribs.containsKey(attrBuildVersion)) {
+            logger.debug "UP-TO-DATE check - exclude dynamic manifest values: no build version found -> assume dynamic implementation version (time stamp) -> exclude implementation version in check"
+
+            oldAttribs.remove(attrImplVersion)
+            mfAttribs.remove(attrImplVersion)
+        }
+
+        return oldMf == mf
     }
 
     private byte[] tryGetCurrentGeneratedContent() {

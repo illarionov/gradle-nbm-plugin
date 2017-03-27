@@ -1,6 +1,10 @@
 package org.gradle.plugins.nbm.integtest
 
+import org.gradle.testkit.runner.TaskOutcome
+
+import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.FileTime
 
 @SuppressWarnings('BlockStartsWithBlankLine')
 class ManifestGenerationTest extends AbstractIntegrationTest {
@@ -298,6 +302,178 @@ nbm {
         then:
         def manifest = checkDefaultModuleManifest()
         assert manifest.get('OpenIDE-Module-Public-Packages') == 'rootpckg.mypckg.**, rootpckg.mypckg.subpckg.**'
+    }
+
+    def "manifest task is UP-TO-DATE on second build without any changes (without custom implementation version)"() {
+
+        given: "Build file with configured nbm plugin"
+        // Set the moduleName because I have no idea what the project's name is,
+        // so can't rely on the default value for that
+
+        buildFile << \
+"""
+apply plugin: org.gradle.plugins.nbm.NbmPlugin
+version = '3.5.6'
+nbm {
+  moduleName = 'com.foo.acme'
+}
+"""
+        when: "Generate netbeans module manifest"
+        println "Run #1"
+        runTasks 'generateModuleManifest'
+
+        Path manifestPath1 = getGeneratedManifestPath()
+        FileTime lastModifiedTime1 = Files.getLastModifiedTime(manifestPath1)
+        def map1 = getGeneratedModuleManifest()
+
+        Thread.sleep(1000) // Ensure build date change (timestamp resolution)
+
+        println "Run #2"
+        def result2 = runTasks 'generateModuleManifest'
+
+        def map2 = getGeneratedModuleManifest()
+        Path manifestPath2 = getGeneratedManifestPath()
+        FileTime lastModifiedTime2 = Files.getLastModifiedTime(manifestPath2)
+
+        then: "Task is UP-TO-DATE on second build"
+        assert result2.task(':generateModuleManifest').outcome == TaskOutcome.UP_TO_DATE
+
+        then: "Generated manifest was not modified"
+        assert lastModifiedTime1 == lastModifiedTime2
+
+        then: "Content of generated manifest has not changed"
+        assert map1 == map2
+    }
+
+    def "manifest task is UP-TO-DATE on second build without any changes (with custom implementation version)"() {
+
+        given: "Build file with configured nbm plugin"
+        buildFile << \
+"""
+apply plugin: org.gradle.plugins.nbm.NbmPlugin
+version = '3.5.6'
+nbm {
+  moduleName = 'com.foo.acme'
+  implementationVersion = version
+}
+"""
+        when: "Generate netbeans module manifest"
+        println "Run #1"
+        runTasks 'generateModuleManifest'
+
+        Path manifestPath1 = getGeneratedManifestPath()
+        FileTime lastModifiedTime1 = Files.getLastModifiedTime(manifestPath1)
+        def map1 = getGeneratedModuleManifest()
+
+        Thread.sleep(1000) // Ensure build date change (timestamp resolution)
+
+        println "Run #2"
+        def result2 = runTasks 'generateModuleManifest'
+
+        def map2 = getGeneratedModuleManifest()
+        Path manifestPath2 = getGeneratedManifestPath()
+        FileTime lastModifiedTime2 = Files.getLastModifiedTime(manifestPath2)
+
+        then: "Task is UP-TO-DATE on second build"
+        assert result2.task(':generateModuleManifest').outcome == TaskOutcome.UP_TO_DATE
+
+        then: "Generated manifest was not modified"
+        assert lastModifiedTime1 == lastModifiedTime2
+
+        then: "Content of generated manifest has not changed"
+        assert map1 == map2
+    }
+
+    def "manifest task is not UP-TO-DATE on second build due to changed specification version (without custom implementation version)"() {
+
+        given: "Build file with configured nbm plugin"
+        buildFile << \
+"""
+apply plugin: org.gradle.plugins.nbm.NbmPlugin
+version = '3.5.6'
+nbm {
+  moduleName = 'com.foo.acme'
+}
+"""
+        when: "Generate netbeans module manifest"
+        println "Run #1"
+        runTasks 'generateModuleManifest'
+
+        Path manifestPath1 = getGeneratedManifestPath()
+        FileTime lastModifiedTime1 = Files.getLastModifiedTime(manifestPath1)
+        def map1 = getGeneratedModuleManifest()
+
+        Thread.sleep(1000) // Ensure build date change (timestamp resolution)
+        buildFile << \
+"""
+apply plugin: org.gradle.plugins.nbm.NbmPlugin
+version = '3.5.7'
+nbm {
+  moduleName = 'com.foo.acme/1'
+}
+"""
+        println "Run #2"
+        def result2 = runTasks 'generateModuleManifest'
+
+        def map2 = getGeneratedModuleManifest()
+        Path manifestPath2 = getGeneratedManifestPath()
+        FileTime lastModifiedTime2 = Files.getLastModifiedTime(manifestPath2)
+
+        then: "Task is not UP-TO-DATE on second build"
+        assert result2.task(':generateModuleManifest').outcome == TaskOutcome.SUCCESS
+
+        then: "Generated manifest was not modified"
+        assert lastModifiedTime1 != lastModifiedTime2
+
+        then: "Content of generated manifest has not changed"
+        assert map1 != map2
+    }
+
+    def "manifest task is not UP-TO-DATE on second build due to changed implementation version (with custom implementation version)"() {
+
+        given: "Build file with configured nbm plugin"
+        buildFile << \
+"""
+apply plugin: org.gradle.plugins.nbm.NbmPlugin
+version = '3.5.6'
+nbm {
+  moduleName = 'com.foo.acme'
+  implementationVersion = version
+}
+"""
+        when: "Generate netbeans module manifest"
+        println "Run #1"
+        runTasks 'generateModuleManifest'
+
+        Path manifestPath1 = getGeneratedManifestPath()
+        FileTime lastModifiedTime1 = Files.getLastModifiedTime(manifestPath1)
+        def map1 = getGeneratedModuleManifest()
+
+        Thread.sleep(1000) // Ensure build date change (timestamp resolution)
+        buildFile << \
+"""
+apply plugin: org.gradle.plugins.nbm.NbmPlugin
+version = '3.5.6'
+nbm {
+  moduleName = 'com.foo.acme'
+  implementationVersion = '3.5.6.1'
+}
+"""
+        println "Run #2"
+        def result2 = runTasks 'generateModuleManifest'
+
+        def map2 = getGeneratedModuleManifest()
+        Path manifestPath2 = getGeneratedManifestPath()
+        FileTime lastModifiedTime2 = Files.getLastModifiedTime(manifestPath2)
+
+        then: "Task is not UP-TO-DATE on second build"
+        assert result2.task(':generateModuleManifest').outcome == TaskOutcome.SUCCESS
+
+        then: "Generated manifest was not modified"
+        assert lastModifiedTime1 != lastModifiedTime2
+
+        then: "Content of generated manifest has not changed"
+        assert map1 != map2
     }
 
     def setupDefaultSources() {

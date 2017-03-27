@@ -68,7 +68,7 @@ public final class NbmPluginExtension {
         this.autoupdateShowInClient = true;
 
         // Initializse default values
-        this.buildDate = new SimpleDateFormat("yyyyMMddHHmm").format(new Date(System.currentTimeMillis()));
+        this.buildDate = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date(System.currentTimeMillis()));
         requires("org.openide.modules.ModuleFormat1");
     }
 
