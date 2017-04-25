@@ -1,5 +1,6 @@
 package org.gradle.plugins.nbm;
 
+import org.gradle.api.Project;
 import org.gradle.api.tasks.SourceSet;
 
 import java.io.File;
@@ -7,13 +8,18 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.regex.Pattern;
 
-public final class NbmFriendPackages {
-    private final List<PackageNameGenerator> packageList;
+public final class ModulePublicPackagesList {
 
-    public NbmFriendPackages() {
-        this.packageList = new LinkedList<>();
+    private final List<PackageNameGenerator> packageNameGenerators;
+    private final Project project;
+
+    public ModulePublicPackagesList(Project project) {
+        this.project = project;
+        this.packageNameGenerators = new LinkedList<>();
     }
 
     private static void getPackagesInDir(String packageName, File currentDir, List<String> result) {
@@ -57,7 +63,7 @@ public final class NbmFriendPackages {
         Objects.requireNonNull(sourceSet, "sourceSet");
         Objects.requireNonNull(packageName, "packageName");
 
-        packageList.add(new PackageNameGenerator() {
+        packageNameGenerators.add(new PackageNameGenerator() {
             @Override
             public void findPackages(List<String> result) {
                 findAllPackages(sourceSet, packageName, result);
@@ -68,7 +74,7 @@ public final class NbmFriendPackages {
     public void add(final String packageName) {
         Objects.requireNonNull(packageName, "packageName");
 
-        packageList.add(new PackageNameGenerator() {
+        packageNameGenerators.add(new PackageNameGenerator() {
             @Override
             public void findPackages(List<String> result) {
                 result.add(packageName);
@@ -76,21 +82,35 @@ public final class NbmFriendPackages {
         });
     }
 
-    public List<String> getPackageList() {
+    private List<String> resolvePackageNames() {
         List<String> result = new LinkedList<>();
-        for (PackageNameGenerator currentNames : packageList) {
+        for (PackageNameGenerator currentNames : packageNameGenerators) {
             currentNames.findPackages(result);
         }
         return result;
     }
 
-    public List<String> getPackageListPattern() {
-        List<String> packages = getPackageList();
-        List<String> result = new ArrayList<>(packages.size());
-        for (String packageName : packages) {
-            result.add(toStarImport(packageName));
+    public SortedSet<String> getEntries() {
+        List<String> packageNames = resolvePackageNames();
+        SortedSet<String> entries = new TreeSet<>();
+        for (String packageName : packageNames) {
+            entries.add(toStarImport(packageName));
         }
-        return result;
+        return entries;
+    }
+
+    @Deprecated
+    public List<String> getPackageList() {
+        project.getLogger().error(
+            "'nbm' plugin: Use of 'friendPackages.getPackageListPattern()' is deprecated use 'publicPackages.getEntries()' instead!");
+        return resolvePackageNames();
+    }
+
+    @Deprecated
+    public List<String> getPackageListPattern() {
+        project.getLogger().error(
+            "'nbm' plugin: Use of 'friendPackages.getPackageListPattern()' is deprecated use 'publicPackages.getEntries()' instead!");
+        return new ArrayList<>(getEntries());
     }
 
     private static String toStarImport(String packageName) {

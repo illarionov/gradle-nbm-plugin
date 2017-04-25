@@ -1,5 +1,6 @@
 package org.gradle.plugins.nbm
 
+import org.gradle.api.InvalidUserDataException
 import org.gradle.api.artifacts.ResolvedArtifact
 import org.gradle.api.artifacts.ResolvedDependency
 import org.gradle.api.file.FileCollection
@@ -108,11 +109,19 @@ class ModuleManifestTask extends ConventionTask {
         }
         result.put('OpenIDE-Module-Specification-Version', netbeansExt().specificationVersion)
 
-        def packageList = netbeansExt().friendPackages.packageListPattern
-        if (!packageList.isEmpty()) {
-            result.put('OpenIDE-Module-Public-Packages', packageList.sort().join(', '))
+        SortedSet<String> publicPackages = netbeansExt().publicPackages.entries
+        if (!publicPackages.isEmpty()) {
+            result.put('OpenIDE-Module-Public-Packages', publicPackages.join(', '))
         } else {
             result.put('OpenIDE-Module-Public-Packages', '-')
+        }
+
+        SortedSet<String> moduleFriends = netbeansExt().moduleFriends.entries
+        if (!moduleFriends.isEmpty()) {
+            if (publicPackages.isEmpty()) {
+                throw new InvalidUserDataException("Module friends can't be specified without defined public packages")
+            }
+            result.put('OpenIDE-Module-Friends', moduleFriends.join(', '))
         }
 
         def layer = netbeansExt().layer

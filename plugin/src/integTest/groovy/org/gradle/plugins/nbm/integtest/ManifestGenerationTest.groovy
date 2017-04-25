@@ -166,7 +166,7 @@ nbm {
         assert !manifest.containsKey('OpenIDE-Module-Build-Version')
     }
 
-    def "friend packages are added to manifest for sub packages"() {
+    def "public packages are added to manifest for sub packages"() {
         // Set the moduleName because I have no idea what the project's name is,
         // so can't rely on the default value for that
         buildFile << \
@@ -177,7 +177,7 @@ nbm {
   moduleName = 'my.test.project'
   implementationVersion = version
 
-  friendPackages {
+  publicPackages {
     addWithSubPackages(sourceSets.main, 'rootpckg.mypckg')
   }
 }
@@ -193,7 +193,7 @@ nbm {
         assert manifest.get('OpenIDE-Module-Public-Packages') == 'rootpckg.mypckg.subpckg.*, rootpckg.mypckg.subpckg3.*'
     }
 
-    def "friend packages are added to manifest for sub packages of root"() {
+    def "public packages are added to manifest for sub packages of root"() {
         // Set the moduleName because I have no idea what the project's name is,
         // so can't rely on the default value for that
         buildFile << \
@@ -204,7 +204,7 @@ nbm {
   moduleName = 'my.test.project'
   implementationVersion = version
 
-  friendPackages {
+  publicPackages {
     addWithSubPackages(sourceSets.main, 'rootpckg')
   }
 }
@@ -220,7 +220,7 @@ nbm {
         assert manifest.get('OpenIDE-Module-Public-Packages') == 'rootpckg.mypckg.subpckg.*, rootpckg.mypckg.subpckg3.*'
     }
 
-    def "friend packages are added explicitly"() {
+    def "public packages are added explicitly"() {
         // Set the moduleName because I have no idea what the project's name is,
         // so can't rely on the default value for that
         buildFile << \
@@ -231,7 +231,7 @@ nbm {
   moduleName = 'my.test.project'
   implementationVersion = version
 
-  friendPackages {
+  publicPackages {
     add 'rootpckg.mypckg'
     add 'rootpckg.mypckg.subpckg'
   }
@@ -248,7 +248,7 @@ nbm {
         assert manifest.get('OpenIDE-Module-Public-Packages') == 'rootpckg.mypckg.*, rootpckg.mypckg.subpckg.*'
     }
 
-    def "friend packages are added explicitly with stars"() {
+    def "public packages are added explicitly with stars"() {
         // Set the moduleName because I have no idea what the project's name is,
         // so can't rely on the default value for that
         buildFile << \
@@ -259,7 +259,7 @@ nbm {
   moduleName = 'my.test.project'
   implementationVersion = version
 
-  friendPackages {
+  publicPackages {
     add 'rootpckg.mypckg.*'
     add 'rootpckg.mypckg.subpckg.*'
   }
@@ -276,7 +276,7 @@ nbm {
         assert manifest.get('OpenIDE-Module-Public-Packages') == 'rootpckg.mypckg.*, rootpckg.mypckg.subpckg.*'
     }
 
-    def "friend packages are added explicitly with double stars"() {
+    def "public packages are added explicitly with double stars"() {
         // Set the moduleName because I have no idea what the project's name is,
         // so can't rely on the default value for that
         buildFile << \
@@ -287,7 +287,7 @@ nbm {
   moduleName = 'my.test.project'
   implementationVersion = version
 
-  friendPackages {
+  publicPackages {
     add 'rootpckg.mypckg.**'
     add 'rootpckg.mypckg.subpckg.**'
   }
@@ -302,6 +302,37 @@ nbm {
         then:
         def manifest = checkDefaultModuleManifest()
         assert manifest.get('OpenIDE-Module-Public-Packages') == 'rootpckg.mypckg.**, rootpckg.mypckg.subpckg.**'
+    }
+
+    def "module friends are added to manifest"() {
+        // Set the moduleName because I have no idea what the project's name is,
+        // so can't rely on the default value for that
+        buildFile << \
+"""
+apply plugin: org.gradle.plugins.nbm.NbmPlugin
+version = '3.5.6'
+nbm {
+  moduleName = 'my.test.project'
+  implementationVersion = version
+
+  publicPackages {
+    addWithSubPackages(sourceSets.main, 'rootpckg.mypckg')
+  }
+
+  moduleFriends {
+    add 'com.foo.acme.friend'
+  }
+}
+"""
+
+        setupDefaultSources()
+
+        when:
+        runTasks 'generateModuleManifest'
+
+        then:
+        def manifest = checkDefaultModuleManifest()
+        assert manifest.get('OpenIDE-Module-Friends') == 'com.foo.acme.friend'
     }
 
     def "manifest task is UP-TO-DATE on second build without any changes (without custom implementation version)"() {

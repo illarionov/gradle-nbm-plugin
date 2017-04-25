@@ -30,7 +30,8 @@ public final class NbmPluginExtension {
     private final List<String> requires;
     private String localizingBundle;
     private String moduleInstall;
-    private final NbmFriendPackages friendPackages;
+    private final ModulePublicPackagesList publicPackages;
+    private final ModuleFriendsList moduleFriends;
     private File licenseFile;
     private String moduleAuthor;
     private String homePage;
@@ -61,7 +62,8 @@ public final class NbmPluginExtension {
         this.needsRestart = null;
         this.eager = false;
         this.autoload = false;
-        this.friendPackages = new NbmFriendPackages();
+        this.publicPackages = new ModulePublicPackagesList(this.project);
+        this.moduleFriends = new ModuleFriendsList(this.project);
         this.keyStore = new NbmKeyStoreDef();
         this.requires = new LinkedList<>();
         this.classpathExtFolder = null;
@@ -76,14 +78,36 @@ public final class NbmPluginExtension {
         return buildDate;
     }
 
-    public NbmFriendPackages getFriendPackages() {
-        return friendPackages;
+    @Deprecated
+    public ModulePublicPackagesList getFriendPackages() {
+        project.getLogger().error("'nbm' plugin: Use of 'friendPackages' is deprecated use 'publicPackages' instead!");
+        return getPublicPackages();
     }
 
-    public void friendPackages(Closure<NbmFriendPackages> configBlock) {
+    public ModulePublicPackagesList getPublicPackages() {
+        return publicPackages;
+    }
+
+    @Deprecated
+    public void friendPackages(Closure<ModulePublicPackagesList> configBlock) {
+        project.getLogger().error("'nbm' plugin: Use of 'friendPackages' is deprecated use 'publicPackages' instead!");
+        publicPackages(configBlock);
+    }
+
+    public void publicPackages(Closure<ModulePublicPackagesList> configBlock) {
         configBlock.setResolveStrategy(Closure.DELEGATE_FIRST);
-        configBlock.setDelegate(friendPackages);
-        configBlock.call(friendPackages);
+        configBlock.setDelegate(publicPackages);
+        configBlock.call(publicPackages);
+    }
+
+    public ModuleFriendsList getModuleFriends() {
+        return moduleFriends;
+    }
+
+    public void moduleFriends(Closure<ModuleFriendsList> configBlock) {
+        configBlock.setResolveStrategy(Closure.DELEGATE_FIRST);
+        configBlock.setDelegate(moduleFriends);
+        configBlock.call(moduleFriends);
     }
 
     public Configuration getHarnessConfiguration() {
