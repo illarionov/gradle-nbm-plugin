@@ -107,9 +107,8 @@ nbm {
   moduleName = 'com.foo.acme'
 }
 dependencies {
-  annotationProcessor 'org.netbeans.api:org-openide-awt:${nbVersion}'
-  implementation 'org.netbeans.api:org-openide-awt:${nbVersion}'
-  implementation 'org.netbeans.api:org-openide-util:${nbVersion}'
+  netbeans 'org.netbeans.api:org-openide-awt:${nbVersion}'
+  netbeans 'org.netbeans.api:org-openide-util:${nbVersion}'
 }
 """
         def srcDir = createNewDir(integTestDir, 'src/main/java/com/mycompany/standalone')
@@ -195,7 +194,7 @@ nbm {
   moduleName = 'com.foo.acme'
 }
 dependencies {
-  implementation 'org.netbeans.api:org-openide-util:${nbVersion}'
+  netbeans 'org.netbeans.api:org-openide-util:${nbVersion}'
   implementation 'org.slf4j:slf4j-api:1.7.2'
 }
 """
@@ -237,7 +236,7 @@ nbm {
   classpathExtFolder = 'acme'
 }
 dependencies {
-  implementation 'org.netbeans.api:org-openide-util:${nbVersion}'
+  netbeans 'org.netbeans.api:org-openide-util:${nbVersion}'
   implementation 'org.slf4j:slf4j-api:1.7.2'
 }
 """
@@ -409,9 +408,8 @@ apply plugin: 'java'
 apply plugin: org.gradle.plugins.nbm.NbmPlugin
 
 dependencies {
-  annotationProcessor 'org.netbeans.api:org-openide-util:${nbVersion}'
-  implementation 'org.netbeans.api:org-openide-awt:${nbVersion}'
-  implementation 'org.netbeans.api:org-openide-util:${nbVersion}'
+  netbeans 'org.netbeans.api:org-openide-awt:${nbVersion}'
+  netbeans 'org.netbeans.api:org-openide-util:${nbVersion}'
   testImplementation "junit:junit:4.11"
 }
 
