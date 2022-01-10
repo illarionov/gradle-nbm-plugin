@@ -4,7 +4,10 @@ import groovy.lang.Closure;
 import org.gradle.api.InvalidUserDataException;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
+import org.gradle.api.file.RegularFile;
+import org.gradle.api.file.RegularFileProperty;
 import org.gradle.api.model.ObjectFactory;
+import org.gradle.api.provider.ListProperty;
 import org.gradle.api.provider.Property;
 import org.gradle.api.provider.Provider;
 import org.gradle.api.provider.ProviderFactory;
@@ -14,42 +17,43 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
-public final class NbmPluginExtension {
+import static java.util.Collections.emptySet;
+
+public class NbmPluginExtension {
     // pattern copied from http://netbeans.org/ns/nb-module-project/3.xsd
     // (code-name-base) and add optional major version to patter
     static final Pattern MODULE_NAME_PATTERN = Pattern.compile(
         "\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*(?:[.]\\p{javaJavaIdentifierPart}+)*(/\\d+)?");
 
-    private String moduleName;
-    private String cluster;
+    private final Property<String> moduleName;
+    private final Property<String> cluster;
     private final Property<String> specificationVersion;
     private final Property<String> implementationVersion;
     private final Property<String> buildVersion;
-    private boolean eager;
-    private boolean autoload;
+    private final Property<Boolean> eager;
+    private final Property<Boolean> autoload;
     private final NbmKeyStoreDef keyStore;
     private final Project project;
-    private final List<String> requires;
-    private String localizingBundle;
-    private String moduleInstall;
+    private final ListProperty<String> requires;
+    private final Property<String> localizingBundle;
+    private final Property<String> moduleInstall;
     private final ModulePublicPackagesList publicPackages;
     private final ModuleFriendsList moduleFriends;
-    private File licenseFile;
-    private String moduleAuthor;
+    private final RegularFileProperty licenseFile;
+    private final Property<String> moduleAuthor;
     private final Property<String> distribution;
-    private String homePage;
-    private Boolean needsRestart;
-    private String layer;
-    private String javaDependency;
+    private final Property<String> homePage;
+    private final Property<Boolean> needsRestart;
+    private final Property<String> layer;
+    private final Property<String> javaDependency;
     private final Property<Boolean> autoupdateShowInClient;
     private final Configuration harnessConfiguration;
-    private String classpathExtFolder;
+    private final Property<String> classpathExtFolder;
     private final Property<Boolean> generateLastModifiedFile;
     private final Provider<Long> lastModifiedTimestampProvider;
 
@@ -66,37 +70,38 @@ public final class NbmPluginExtension {
         this.harnessConfiguration = project.getConfigurations()
             .detachedConfiguration(project.getDependencies().create("org.codehaus.mojo:nbm-maven-harness:8.2"));
 
-        this.moduleName = null;
-        this.cluster = null;
+        this.moduleName = objects.property(String.class)
+            .convention(providers.provider(() -> project.getName().replace('-', '.')));
+        this.cluster = objects.property(String.class).convention("extra");
 
-        this.specificationVersion = objects.property(String.class);
-        this.implementationVersion = objects.property(String.class);
-        this.buildVersion = objects.property(String.class);
-        this.specificationVersion.convention(providers.provider(() -> {
+        this.specificationVersion = objects.property(String.class).convention(providers.provider(() -> {
             return EvaluateUtils.asString(project.getVersion());
         }));
-        buildVersion.convention(providers.provider(() -> {
+        this.implementationVersion = objects.property(String.class);
+        this.buildVersion = objects.property(String.class).convention(providers.provider(() -> {
             return DateTimeFormatter.ofPattern("yyyyMMddHHmss", Locale.ROOT).withZone(ZoneOffset.UTC)
                 .format(getBuildTimestamp());
         }));
 
-        this.localizingBundle = null;
-        this.moduleInstall = null;
-        this.licenseFile = null;
-        this.moduleAuthor = null;
-        this.homePage = null;
-        this.needsRestart = null;
-        this.eager = false;
-        this.autoload = false;
+        this.localizingBundle = objects.property(String.class);
+        this.moduleInstall = objects.property(String.class);
+        this.licenseFile = objects.fileProperty();
+        this.moduleAuthor = objects.property(String.class);
+        this.homePage = objects.property(String.class);
+        this.needsRestart = objects.property(Boolean.class);
+        this.layer = objects.property(String.class);
+        this.javaDependency = objects.property(String.class);
+        this.eager = objects.property(Boolean.class).convention(false);
+        this.autoload = objects.property(Boolean.class).convention(false);
         this.publicPackages = new ModulePublicPackagesList(this.project);
         this.moduleFriends = new ModuleFriendsList(this.project);
-        this.keyStore = new NbmKeyStoreDef();
-        this.requires = new LinkedList<>();
-        this.classpathExtFolder = null;
+        this.keyStore = objects.newInstance(NbmKeyStoreDef.class);
+        this.requires = objects.listProperty(String.class).convention(emptySet());
+        this.classpathExtFolder = objects.property(String.class);
         this.autoupdateShowInClient = objects.property(Boolean.class);
 
         this.distribution = objects.property(String.class);
-        distribution.convention(providers.provider(() -> getModuleName().replace('.', '-') + ".nbm"));
+        distribution.convention(providers.provider(() -> getModuleName().get().replace('.', '-') + ".nbm"));
 
         this.generateLastModifiedFile = objects.property(Boolean.class).convention(true);
         this.lastModifiedTimestampProvider = providers.provider(() -> getBuildTimestamp().toEpochMilli());
@@ -104,7 +109,7 @@ public final class NbmPluginExtension {
         requires("org.openide.modules.ModuleFormat1");
     }
 
-    public Property<String> getSpecificationVersion() {
+    public Provider<String> getSpecificationVersion() {
         return specificationVersion;
     }
 
@@ -112,11 +117,11 @@ public final class NbmPluginExtension {
         this.specificationVersion.set(specificationVersion);
     }
 
-    public void setSpecificationVersion(Provider<? extends String> specificationVersionProvider) {
+    public void setSpecificationVersion(Provider<String> specificationVersionProvider) {
         this.specificationVersion.set(specificationVersionProvider);
     }
 
-    public Property getImplementationVersion() {
+    public Provider<String> getImplementationVersion() {
         return implementationVersion;
     }
 
@@ -124,11 +129,11 @@ public final class NbmPluginExtension {
         this.implementationVersion.set(implementationVersion);
     }
 
-    public void setImplementationVersion(Provider<? extends String> implementationVersionProvider) {
+    public void setImplementationVersion(Provider<String> implementationVersionProvider) {
         this.implementationVersion.set(implementationVersionProvider);
     }
 
-    public Property<String> getBuildVersion() {
+    public Provider<String> getBuildVersion() {
         return buildVersion;
     }
 
@@ -176,23 +181,31 @@ public final class NbmPluginExtension {
         return harnessConfiguration;
     }
 
-    public Boolean getNeedsRestart() {
+    public Provider<Boolean> getNeedsRestart() {
         return needsRestart;
     }
 
     public void setNeedsRestart(Boolean needsRestart) {
-        this.needsRestart = needsRestart;
+        this.needsRestart.set(needsRestart);
     }
 
-    public String getHomePage() {
+    public void setNeedsRestart(Provider<? extends Boolean> needsRestartProvider) {
+        this.needsRestart.set(needsRestartProvider);
+    }
+
+    public Provider<String> getHomePage() {
         return homePage;
     }
 
     public void setHomePage(String homePage) {
-        this.homePage = homePage;
+        this.homePage.set(homePage);
     }
 
-    public Property<String> getDistribution() {
+    public void setHomePage(Provider<String> homePageProvider) {
+        this.homePage.set(homePageProvider);
+    }
+
+    public Provider<String> getDistribution() {
         return distribution;
     }
 
@@ -200,50 +213,78 @@ public final class NbmPluginExtension {
         distribution.set(url);
     }
 
-    public void setDistributionUrl(Provider<? extends String> urlProvider) {
+    public void setDistributionUrl(Provider<String> urlProvider) {
         distribution.set(urlProvider);
     }
 
-    public String getModuleAuthor() {
+    public Provider<String> getModuleAuthor() {
         return moduleAuthor;
     }
 
     public void setModuleAuthor(String moduleAuthor) {
-        this.moduleAuthor = moduleAuthor;
+        this.moduleAuthor.set(moduleAuthor);
     }
 
-    public File getLicenseFile() {
+    public void setModuleAuthor(Provider<String> moduleAuthorProvider) {
+        this.moduleAuthor.set(moduleAuthorProvider);
+    }
+
+    public Provider<RegularFile> getLicenseFile() {
         return licenseFile;
     }
 
-    public void setLicenseFile(Object licenseFile) {
-        this.licenseFile = licenseFile != null ? project.file(licenseFile) : null;
+    public void setLicenseFile(File licenseFile) {
+        this.licenseFile.set(licenseFile);
     }
 
-    public String getModuleInstall() {
+    public void setLicenseFile(RegularFile licenseFile) {
+        this.licenseFile.set(licenseFile);
+    }
+
+    public void setLicenseFile(Provider<? extends RegularFile> licenseFileProvider) {
+        this.licenseFile.set(licenseFileProvider);
+    }
+
+    public void setLicenseFile(Object licenseFile) {
+        this.licenseFile.set(project.file(licenseFile));
+    }
+
+    public Provider<String> getModuleInstall() {
         return moduleInstall;
     }
 
     public void setModuleInstall(String moduleInstall) {
-        this.moduleInstall = moduleInstall;
+        this.moduleInstall.set(moduleInstall);
     }
 
-    public String getLocalizingBundle() {
+    public void setModuleInstall(Provider<String> moduleInstall) {
+        this.moduleInstall.set(moduleInstall);
+    }
+
+    public Provider<String> getLocalizingBundle() {
         return localizingBundle;
     }
 
     public void setLocalizingBundle(String localizingBundle) {
-        this.localizingBundle = localizingBundle;
+        this.localizingBundle.set(localizingBundle);
     }
 
-    public List<String> getRequires() {
+    public void setLocalizingBundle(Provider<String> localizingBundleProvider) {
+        this.localizingBundle.set(localizingBundleProvider);
+    }
+
+    public Provider<List<String>> getRequires() {
         return requires;
     }
 
     public void setRequires(List<String> requires) {
         Objects.requireNonNull(requires, "requires");
-        this.requires.clear();
-        this.requires.addAll(requires);
+        this.requires.set(requires);
+    }
+
+    public void setRequires(Provider<? extends List<String>> requires) {
+        Objects.requireNonNull(requires, "requires");
+        this.requires.set(requires);
     }
 
     public void requires(String dependency) {
@@ -260,59 +301,90 @@ public final class NbmPluginExtension {
         return keyStore;
     }
 
-    public String getModuleName() {
-        if (moduleName == null) {
-            return project.getName().replace('-', '.');
-        }
-        return moduleName;
+    public Provider<String> getModuleName() {
+        return moduleName.map(name -> {
+            if (!MODULE_NAME_PATTERN.matcher(name).matches()) {
+                throw new InvalidUserDataException(
+                    "Illegal module friend name - '" + name + "' (must match '" + MODULE_NAME_PATTERN + "'");
+            }
+            return name;
+        });
     }
 
     public void setModuleName(String moduleName) {
-        if (!MODULE_NAME_PATTERN.matcher(moduleName).matches()) {
-            throw new InvalidUserDataException(
-                "Illegal module friend name - '" + moduleName + "' (must match '" + MODULE_NAME_PATTERN + "'");
-        }
-        this.moduleName = moduleName;
+        this.moduleName.set(moduleName);
     }
 
-    public String getCluster() {
+    public void setModuleName(Provider<String> moduleNameProvider) {
+        this.moduleName.set(moduleNameProvider);
+    }
+
+    public Provider<String> getCluster() {
         return cluster;
     }
 
     public void setCluster(String cluster) {
-        this.cluster = cluster;
+        this.cluster.set(cluster);
     }
 
-    public boolean isEager() {
+    public void setCluster(Provider<String> clusterProvider) {
+        this.cluster.set(clusterProvider);
+    }
+
+    public Provider<Boolean> getEager() {
         return eager;
     }
 
     public void setEager(boolean eager) {
-        this.eager = eager;
+        this.eager.set(eager);
     }
 
-    public boolean isAutoload() {
+    public void setEager(String eager) {
+        this.eager.set(Boolean.valueOf(eager));
+    }
+
+    public void setEager(Provider<? extends Boolean> eagerProvider) {
+        this.eager.set(eagerProvider);
+    }
+
+    public Provider<Boolean> getAutoload() {
         return autoload;
     }
 
     public void setAutoload(boolean autoload) {
-        this.autoload = autoload;
+        this.autoload.set(autoload);
     }
 
-    public String getLayer() {
+    public void setAutoload(String autoload) {
+        this.autoload.set(Boolean.valueOf(autoload));
+    }
+
+    public void setAutoload(Provider<? extends Boolean> autoloadProvider) {
+        this.autoload.set(autoloadProvider);
+    }
+
+    public Provider<String> getLayer() {
         return layer;
     }
 
     public void setLayer(String layer) {
-        this.layer = layer;
+        this.layer.set(layer);
     }
 
-    public String getJavaDependency() {
+    public void setLayer(Provider<String> layerProvider) {
+        this.layer.set(layerProvider);
+    }
+
+    public Provider<String> getJavaDependency() {
         return javaDependency;
     }
 
     public void setJavaDependency(String javaDependency) {
-        this.javaDependency = javaDependency;
+        this.javaDependency.set(javaDependency);
+    }
+
+    public void setJavaDependency(Provider<String> javaDependencyProvider) {
+        this.javaDependency.set(javaDependencyProvider);
     }
 
     public Provider<Boolean> getAutoupdateShowInClient() {
@@ -327,15 +399,19 @@ public final class NbmPluginExtension {
         this.autoupdateShowInClient.set(autoupdateShowInClientProvider);
     }
 
-    public String getClasspathExtFolder() {
+    public Provider<String> getClasspathExtFolder() {
         return classpathExtFolder;
     }
 
     public void setClasspathExtFolder(String classpathExtFolder) {
-        this.classpathExtFolder = classpathExtFolder;
+        this.classpathExtFolder.set(classpathExtFolder);
     }
 
-    public Property<Boolean> getGenerateLastModifiedFile() {
+    public void setClasspathExtFolder(Provider<String> classpathExtFolder) {
+        this.classpathExtFolder.set(classpathExtFolder);
+    }
+
+    public Provider<Boolean> getGenerateLastModifiedFile() {
         return generateLastModifiedFile;
     }
 

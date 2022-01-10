@@ -1,30 +1,72 @@
 package org.gradle.plugins.nbm
 
 import org.gradle.api.InvalidUserDataException
+import org.gradle.api.artifacts.Configuration
 import org.gradle.api.artifacts.ResolvedArtifact
 import org.gradle.api.artifacts.ResolvedDependency
+import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.FileCollection
 import org.gradle.api.file.FileVisitDetails
 import org.gradle.api.internal.ConventionTask
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Classpath
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.Nested
+import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputFile
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
+
+import javax.inject.Inject
 
 import java.nio.file.Files
 import java.util.jar.Attributes
 import java.util.jar.JarFile
 import java.util.jar.Manifest
 
-class ModuleManifestTask extends ConventionTask {
-    @OutputFile
-    File generatedManifestFile
+import static java.util.Collections.emptySet
 
-    public ModuleManifestTask() {
+abstract class ModuleManifestTask extends ConventionTask {
+
+    private ModuleManifestConfig moduleManifestConfig
+
+    @Inject
+    ModuleManifestTask() {
         outputs.upToDateWhen { checkUpToDate() }
     }
 
-    private NbmPluginExtension netbeansExt() {
-        project.extensions.nbm
+    @OutputFile
+    abstract Property<File> getGeneratedManifestFile()
+
+    @Nested
+    ModuleManifestConfig getManifestConfig() {
+        return moduleManifestConfig
     }
+
+    void setModuleManifestConfig(ModuleManifestConfig config) {
+        this.moduleManifestConfig = config
+    }
+
+    @Input
+    @Optional
+    abstract Property<String> getNetbeansClasspathExtFolder()
+
+    @Classpath
+    abstract ConfigurableFileCollection getNetbeansClasspath()
+
+    @InputFiles
+    @PathSensitive(PathSensitivity.RELATIVE)
+    abstract Property<Configuration> getRuntimeConfiguration()
+
+    @InputFiles
+    @PathSensitive(PathSensitivity.RELATIVE)
+    abstract Property<Configuration> getNbImplementationConfiguration()
+
+    @InputFiles
+    @PathSensitive(PathSensitivity.RELATIVE)
+    abstract Property<Configuration> getBundleConfiguration()
 
     public boolean checkUpToDate() {
         byte[] actualBytes = tryGetCurrentGeneratedContent()
@@ -57,7 +99,7 @@ class ModuleManifestTask extends ConventionTask {
     }
 
     private byte[] tryGetCurrentGeneratedContent() {
-        def manifestFile = getGeneratedManifestFile().toPath()
+        def manifestFile = getGeneratedManifestFile().get().toPath()
         if (!Files.isRegularFile(manifestFile)) {
             return null
         }
@@ -88,20 +130,20 @@ class ModuleManifestTask extends ConventionTask {
 
         result.put('Created-By', 'Gradle NBM plugin')
 
-        def requires = netbeansExt().requires;
+        def requires = manifestConfig.requires.getOrElse([]);
         if (!requires.isEmpty()) {
             result.put('OpenIDE-Module-Requires', requires.join(', '))
         }
 
-        def localizingBundle = netbeansExt().localizingBundle
+        def localizingBundle = manifestConfig.localizedBundle.getOrNull()
         if (localizingBundle) {
             result.put('OpenIDE-Module-Localizing-Bundle', localizingBundle)
         }
 
-        result.put('OpenIDE-Module', netbeansExt().moduleName)
+        result.put('OpenIDE-Module', manifestConfig.moduleName.get())
 
-        String buildVersion = netbeansExt().buildVersion.get()
-        String implVersion = netbeansExt().implementationVersion.getOrNull()
+        String buildVersion = manifestConfig.buildVersion.getOrNull()
+        String implVersion = manifestConfig.implementationVersion.getOrNull()
         if (implVersion == null) {
             implVersion = buildVersion
             buildVersion = null
@@ -115,16 +157,16 @@ class ModuleManifestTask extends ConventionTask {
             result.put('OpenIDE-Module-Build-Version', buildVersion)
         }
 
-        result.put('OpenIDE-Module-Specification-Version', netbeansExt().specificationVersion.get())
+        result.put('OpenIDE-Module-Specification-Version', manifestConfig.specificationVersion.get())
 
-        SortedSet<String> publicPackages = netbeansExt().publicPackages.entries
+        Set<String> publicPackages = manifestConfig.publicPackages.getOrElse(emptySet())
         if (!publicPackages.isEmpty()) {
             result.put('OpenIDE-Module-Public-Packages', publicPackages.join(', '))
         } else {
             result.put('OpenIDE-Module-Public-Packages', '-')
         }
 
-        SortedSet<String> moduleFriends = netbeansExt().moduleFriends.entries
+        Set<String> moduleFriends = manifestConfig.moduleFriends.getOrElse(emptySet())
         if (!moduleFriends.isEmpty()) {
             if (publicPackages.isEmpty()) {
                 throw new InvalidUserDataException("Module friends can't be specified without defined public packages")
@@ -132,22 +174,22 @@ class ModuleManifestTask extends ConventionTask {
             result.put('OpenIDE-Module-Friends', moduleFriends.join(', '))
         }
 
-        def layer = netbeansExt().layer
+        def layer = manifestConfig.layer.getOrNull()
         if (layer) {
             result.put('OpenIDE-Module-Layer', layer)
         }
 
-        def javaDependency = netbeansExt().javaDependency
+        def javaDependency = manifestConfig.javaDependency.getOrNull()
         if (javaDependency) {
             result.put('OpenIDE-Module-Java-Dependencies', javaDependency)
         }
 
-        def autoupdateShowInClient = netbeansExt().autoupdateShowInClient.getOrNull()
+        def autoupdateShowInClient = manifestConfig.autoupdateShowInClient.getOrNull()
         if (autoupdateShowInClient != null) {
             result.put('AutoUpdate-Show-In-Client', autoupdateShowInClient.toString())
         }
 
-        def moduleInstall = netbeansExt().moduleInstall
+        def moduleInstall = manifestConfig.moduleInstall.getOrNull()
         if (moduleInstall) {
             result.put('OpenIDE-Module-Install', moduleInstall.replace('.', '/') + '.class')
         }
@@ -158,16 +200,15 @@ class ModuleManifestTask extends ConventionTask {
     private Map<String, String> computeModuleDependencies() {
         Map<String, String> moduleDeps = new TreeMap()
 
-        def mainSourceSet = project.sourceSets.main
-        def compileConfig = project.configurations.findByName(mainSourceSet.runtimeClasspathConfigurationName).resolvedConfiguration
+        def compileConfig = getRuntimeConfiguration().get().resolvedConfiguration
 
         Set<ResolvedArtifact> implArtifacts = new HashSet<>()
-        project.configurations.nbimplementation.resolvedConfiguration.firstLevelModuleDependencies.each { ResolvedDependency it ->
+        getNbImplementationConfiguration().get().resolvedConfiguration.firstLevelModuleDependencies.each { ResolvedDependency it ->
             implArtifacts.addAll(it.moduleArtifacts)
         }
 
         Set<ResolvedArtifact> bundleArtifacts = new HashSet<>()
-        project.configurations.bundle.resolvedConfiguration.firstLevelModuleDependencies.each { ResolvedDependency it ->
+        getBundleConfiguration().get().resolvedConfiguration.firstLevelModuleDependencies.each { ResolvedDependency it ->
             bundleArtifacts.addAll(it.moduleArtifacts)
         }
 
@@ -211,7 +252,7 @@ class ModuleManifestTask extends ConventionTask {
 
     @TaskAction
     void generate() {
-        def manifestFile = getGeneratedManifestFile()
+        def manifestFile = getGeneratedManifestFile().get()
         logger.info "Generating NetBeans module manifest $manifestFile"
 
         def os = new FileOutputStream(manifestFile)
@@ -224,8 +265,8 @@ class ModuleManifestTask extends ConventionTask {
 
     private String computeClasspath() {
         def jarNames = [] as Set
-        FileCollection classpath = project.tasks.findByPath('netbeans').classpath
-        String classpathExtFolder = netbeansExt().classpathExtFolder
+        FileCollection classpath = getNetbeansClasspath()
+        String classpathExtFolder = getNetbeansClasspathExtFolder().getOrNull()
         classpath.asFileTree.visit { FileVisitDetails fvd ->
             if (fvd.directory) return
             if (!fvd.name.endsWith('jar')) return

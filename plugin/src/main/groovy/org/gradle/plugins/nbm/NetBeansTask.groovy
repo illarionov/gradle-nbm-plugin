@@ -3,18 +3,26 @@ package org.gradle.plugins.nbm
 import org.apache.tools.ant.taskdefs.Taskdef
 import org.apache.tools.ant.types.FileSet
 import org.apache.tools.ant.types.Path
+import org.gradle.api.artifacts.Configuration
+import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.CopySpec
-import org.gradle.api.file.FileCollection
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.FileSystemOperations
 import org.gradle.api.file.FileTreeElement
+import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.internal.ConventionTask
 import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.Nested
 import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
+
+import javax.inject.Inject
 
 import java.util.jar.Attributes
 import java.util.jar.JarFile
@@ -22,10 +30,12 @@ import java.util.jar.JarFile
 abstract class NetBeansTask extends ConventionTask {
     public static final String TEST_USER_DIR_NAME = 'testuserdir'
 
-    private FileCollection classpath
+    private final FileSystemOperations fileOperations;
+
+    private NetbeansModuleStatusXml netbeansModuleStatusXml;
 
     @OutputDirectory
-    File moduleBuildDir
+    abstract DirectoryProperty getModuleBuildDir()
 
     @Input
     @Optional
@@ -34,41 +44,42 @@ abstract class NetBeansTask extends ConventionTask {
     @Internal
     abstract Property<Long> getLastModifiedTimestampProvider()
 
-    private NbmPluginExtension netbeansExt() {
-        project.extensions.nbm
-    }
-
     @InputFile
-    File getInputModuleJarFile() {
-        project.tasks.jar.archivePath
-    }
+    abstract RegularFileProperty getInputModuleJarFile()
 
+    @Input
+    abstract Property<String> getOutputModuleJarFileName()
+
+    @Input
+    @Optional
+    abstract Property<String> getClasspathExtFolder()
+
+    /**
+     * Classpath to include in the module content.
+     */
     @InputFiles
     @Optional
-    FileCollection getClasspath() {
-        return classpath
+    abstract ConfigurableFileCollection getClasspath()
+
+    @Classpath
+    abstract Property<Configuration> getHarnessConfiguration()
+
+    @Inject
+    public NetBeansTask(FileSystemOperations fileOperations) {
+        this.fileOperations = fileOperations
     }
 
-    /**
-     * Sets the classpath to include in the module content.
-     *
-     * @param classpath The classpath. Must not be null.
-     */
-    void setClasspath(Object classpath) {
-        this.classpath = project.files(classpath)
+    @Nested
+    public NetbeansModuleStatusXml getNetbeansModuleStatusXml() {
+        return netbeansModuleStatusXml
     }
 
-    /**
-     * Adds files to the classpath to include in the module content.
-     *
-     * @param classpath The files to add. These are evaluated as per {@link org.gradle.api.Project#files(Object [])}
-     */
-    void classpath(Object... classpath) {
-        FileCollection oldClasspath = getClasspath()
-        this.classpath = project.files(oldClasspath ?: [], classpath)
+    public setNetbeansModuleStatusXml(NetbeansModuleStatusXml netbeansModuleStatusXml) {
+        this.netbeansModuleStatusXml = netbeansModuleStatusXml;
     }
 
-    private File getCacheDir() {
+    @Internal
+    protected File getCacheDir() {
         File result = project.buildDir
         result = new File(result, TEST_USER_DIR_NAME)
         result = new File(result, 'var')
@@ -78,7 +89,7 @@ abstract class NetBeansTask extends ConventionTask {
 
     @TaskAction
     void generate() {
-        def moduleDir = getModuleBuildDir()
+        def moduleDir = getModuleBuildDir().get().getAsFile()
         if (!moduleDir.isDirectory()) {
             moduleDir.mkdirs()
         }
@@ -93,19 +104,22 @@ abstract class NetBeansTask extends ConventionTask {
 
         def modulesDir = new File(moduleDir, 'modules')
 
-        def classpathExtFolder = netbeansExt().classpathExtFolder
+        def classpathExtFolder = classpathExtFolder.getOrNull()
         def modulesExtDir = new File(modulesDir, 'ext' + (classpathExtFolder ? "/$classpathExtFolder" : ""))
 
-        project.delete(getCacheDir())
+        fileOperations.delete {
+            delete(getCacheDir())
+        }
 
-        def moduleJarName = netbeansExt().moduleName.replace('.', '-') + '.jar'
-        project.copy { CopySpec it ->
+        def moduleJarName = getOutputModuleJarFileName().get()
+
+        fileOperations.copy { CopySpec it ->
             it.from(inputModuleJarFile)
             it.into(modulesDir)
             it.rename('.*\\.jar', moduleJarName)
         }
 
-        project.copy { CopySpec it ->
+        fileOperations.copy { CopySpec it ->
             it.from(classpath)
             it.into(modulesExtDir)
             it.exclude { FileTreeElement fte ->
@@ -126,9 +140,9 @@ abstract class NetBeansTask extends ConventionTask {
         moduleFileSet.setDir(moduleDir)
         moduleFileSet.setIncludes('modules' + File.separator + moduleJarName)
 
-        if (netbeansExt().isAutoload()) {
+        if (netbeansModuleStatusXml.isAutoload.getOrElse(false)) {
             moduleXmlTask.addAutoload(moduleFileSet)
-        } else if (netbeansExt().isEager()) {
+        } else if (netbeansModuleStatusXml.isEager.getOrElse(false)) {
             moduleXmlTask.addEager(moduleFileSet)
         } else {
             moduleXmlTask.addEnabled(moduleFileSet)
@@ -151,12 +165,12 @@ abstract class NetBeansTask extends ConventionTask {
         Taskdef taskdef = antProject.createTask("taskdef")
         taskdef.classname = "org.netbeans.nbbuild.MakeListOfNBM"
         taskdef.name = "genlist"
-        taskdef.classpath = new Path(antProject, netbeansExt().harnessConfiguration.asPath)
+        taskdef.classpath = new Path(antProject, getHarnessConfiguration().get().asPath)
         taskdef.execute()
         Taskdef taskdef2 = antProject.createTask("taskdef")
         taskdef2.classname = "org.netbeans.nbbuild.CreateModuleXML"
         taskdef2.name = "module-xml"
-        taskdef2.classpath = new Path(antProject, netbeansExt().harnessConfiguration.asPath)
+        taskdef2.classpath = new Path(antProject, getHarnessConfiguration().get().asPath)
         taskdef2.execute()
         return getAnt();
     }

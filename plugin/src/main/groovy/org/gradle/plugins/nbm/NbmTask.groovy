@@ -2,88 +2,116 @@ package org.gradle.plugins.nbm
 
 import org.apache.tools.ant.taskdefs.Taskdef
 import org.apache.tools.ant.types.Path
-import org.gradle.api.file.FileCollection
+import org.gradle.api.artifacts.Configuration
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.RegularFile
 import org.gradle.api.internal.ConventionTask
+import org.gradle.api.provider.Property
+import org.gradle.api.provider.Provider
+import org.gradle.api.tasks.Classpath
+import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.Nested
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
 
-class NbmTask extends ConventionTask {
+abstract class NbmTask extends ConventionTask {
 
-    @OutputFile
-    File getOutputFile() {
-        def moduleJarName = netbeansExt().moduleName.replace('.', '-')
-        new File(getNbmBuildDir(), moduleJarName + '.nbm')
-    }
+    private NetbeansAutoupdateModuleInfoXml autoupdateModuleInfoXml
+
+    private NbmKeyStoreDef keyStore
 
     @OutputDirectory
-    File nbmBuildDir
+    abstract DirectoryProperty getNbmBuildDir()
+
+    @Input
+    abstract Property<String> getOutputFileName()
 
     @InputFiles
-    FileCollection getModuleFiles() {
-        project.files(project.tasks.netbeans.getModuleBuildDir()).builtBy(project.tasks.netbeans)
+    abstract DirectoryProperty getModuleBuildDir()
+
+    @Input
+    abstract Property<String> getModuleJarFileName()
+
+    @Classpath
+    abstract Property<Configuration> getHarnessConfiguration()
+
+    @Nested
+    NetbeansAutoupdateModuleInfoXml getAutoupdateModuleInfoXml() {
+        return autoupdateModuleInfoXml;
     }
 
-    private NbmPluginExtension netbeansExt() {
-        project.extensions.nbm
+    void setAutoupdateModuleInfoXml(NetbeansAutoupdateModuleInfoXml moduleInfoXml) {
+        this.autoupdateModuleInfoXml = moduleInfoXml;
+    }
+
+    @Nested
+    NbmKeyStoreDef getKeyStore() {
+        return keyStore
+    }
+
+    void setKeyStore(NbmKeyStoreDef keyStore) {
+        this.keyStore = keyStore
+    }
+
+    @OutputFile
+    Provider<RegularFile> getOutputFile() {
+        return getNbmBuildDir().flatMap {
+            return it.file(getOutputFileName())
+        }
     }
 
     @TaskAction
     void generate() {
-        def nbmFile = getOutputFile()
-        def nbmDir = getNbmBuildDir()
+        def nbmFile = getOutputFile().get().asFile
+        def nbmDir = getNbmBuildDir().get().asFile
         if (!nbmDir.isDirectory()) {
             nbmDir.mkdirs()
         }
 
-        NbmPluginExtension nbm = netbeansExt();
-
-        def moduleJarName = nbm.moduleName.replace('.', '-')
-
         def makenbm = antBuilder().antProject.createTask("makenbm")
-        makenbm.productDir = project.tasks.netbeans.getModuleBuildDir()
+        makenbm.productDir = getModuleBuildDir().get().asFile
         makenbm.file = nbmFile
-        makenbm.module = "modules" + File.separator + moduleJarName + ".jar"
+        makenbm.module = "modules" + File.separator + getModuleJarFileName().get()
 
-        File licenseFile = nbm.licenseFile
+        RegularFile licenseFile = autoupdateModuleInfoXml.licenseFile.getOrNull()
         if (licenseFile != null) {
-            makenbm.createLicense().file = licenseFile
+            makenbm.createLicense().file = licenseFile.asFile
         }
 
-        String moduleAuthor = nbm.moduleAuthor
+        String moduleAuthor = autoupdateModuleInfoXml.moduleAuthor.getOrNull()
         if (moduleAuthor != null) {
             makenbm.moduleauthor = moduleAuthor
         }
 
-        String homePage = nbm.homePage
+        String homePage = autoupdateModuleInfoXml.homePage.getOrNull()
         if (homePage != null) {
             makenbm.homepage = homePage
         }
 
-        String distribution = nbm.distribution.get()
+        String distribution = autoupdateModuleInfoXml.distribution.getOrNull()
         if (distribution != null) {
             makenbm.distribution = distribution
         }
 
-        Boolean needsRestart = nbm.needsRestart
+        Boolean needsRestart = autoupdateModuleInfoXml.needRestart.getOrNull()
         if (needsRestart != null) {
             makenbm.needsrestart = needsRestart.toString()
         }
 
-        NbmKeyStoreDef keyStore = nbm.keyStore
-        def keyStoreFile = EvaluateUtils.asPath(keyStore.keyStoreFile)
+        def keyStoreFile = keyStore.keyStoreFile.getOrNull()
         if (keyStoreFile != null) {
             def signature = makenbm.createSignature()
-            signature.keystore = keyStoreFile.toFile()
-            signature.alias = keyStore.username
-            signature.storepass = keyStore.password
+            signature.keystore = keyStoreFile.asFile
+            signature.alias = keyStore.username.getOrNull()
+            signature.storepass = keyStore.password.getOrNull()
         }
 
         // The CreateNbmMojo class tests for "extra" (the default cluster)
         // and will not set the target cluster to that value.  We should do the
         // same.
-        String cluster = nbm.cluster ?: "extra"
+        String cluster = autoupdateModuleInfoXml.cluster.getOrElse('extra')
         if (!cluster.equals("extra")) {
             makenbm.setTargetcluster(cluster)
         }
@@ -97,7 +125,7 @@ class NbmTask extends ConventionTask {
         Taskdef taskdef = antProject.createTask("taskdef")
         taskdef.classname = "org.netbeans.nbbuild.MakeNBM"
         taskdef.name = "makenbm"
-        taskdef.classpath = new Path(antProject, netbeansExt().harnessConfiguration.asPath)
+        taskdef.classpath = new Path(antProject, harnessConfiguration.get().asPath)
         taskdef.execute()
         return getAnt();
     }

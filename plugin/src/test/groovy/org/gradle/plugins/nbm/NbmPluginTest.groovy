@@ -26,11 +26,17 @@ public class NbmPluginTest {
         project.project.plugins.apply(NbmPlugin)
 
         def nbmTask = project.tasks.nbm
-        assertNotNull(nbmTask)
-        // assertTrue(task instanceof NbmTask)
-        assertTrue(project.tasks.netbeans in nbmTask.dependsOn)
         def netbeansTask = project.tasks.netbeans
-        assertTrue(project.tasks.jar in netbeansTask.dependsOn)
+
+        assertNotNull(nbmTask)
+
+        def nbmTasksDeps = nbmTask.getTaskDependencies().getDependencies(nbmTask)
+        def netbeansTaskDeps = netbeansTask.getTaskDependencies().getDependencies(netbeansTask)
+
+        // assertTrue(task instanceof NbmTask)
+        assertTrue(nbmTasksDeps.contains(netbeansTask))
+
+        assertTrue(netbeansTaskDeps.contains(project.tasks.jar))
     }
 
     @Test
@@ -71,9 +77,9 @@ public class NbmPluginTest {
         Task jarTask = project.tasks.find { jarTask -> jarTask.name == 'jar' }
         assertNotNull(jarTask)
         def manifestTasks = project.getTasks().withType(ModuleManifestTask)
-        assertNotNull(manifestTasks)
+        def jarTasksDeps = jarTask.getTaskDependencies().getDependencies(jarTask)
 
-        assertTrue(manifestTasks.iterator().next() in jarTask.dependsOn)
+        assertTrue jarTasksDeps.contains(manifestTasks.iterator().next())
     }
 
     // nbm plugin hooks directories for merged properties
@@ -94,7 +100,7 @@ public class NbmPluginTest {
         Project project = ProjectBuilder.builder().withName('my_test_project').build()
         project.project.plugins.apply(NbmPlugin)
 
-        assertEquals(project.nbm.moduleName, 'my_test_project')
+        assertEquals('my_test_project', project.nbm.moduleName.get())
     }
 
     // default module name is the project name with dots instead of dashes.
@@ -103,7 +109,7 @@ public class NbmPluginTest {
         Project project = ProjectBuilder.builder().withName('my-test-project').build()
         project.project.plugins.apply(NbmPlugin)
 
-        assertEquals(project.nbm.moduleName, 'my.test.project')
+        assertEquals('my.test.project', project.nbm.moduleName.get())
     }
 
     // no implementation version by default

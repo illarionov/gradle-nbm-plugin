@@ -126,7 +126,7 @@ ruleset {
     VectorIsObsolete
 
     // rulesets/design.xml
-    AbstractClassWithPublicConstructor
+    // AbstractClassWithPublicConstructor
     // AbstractClassWithoutAbstractMethod
     AssignmentToStaticFieldFromInstanceMethod
     BooleanMethodReturnsNull

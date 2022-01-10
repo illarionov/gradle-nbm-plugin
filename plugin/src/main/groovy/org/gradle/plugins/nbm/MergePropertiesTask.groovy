@@ -1,31 +1,39 @@
 package org.gradle.plugins.nbm
 
-import org.gradle.api.internal.ConventionTask
+import org.gradle.api.DefaultTask
+import org.gradle.api.file.Directory
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.FileSystemOperations
+import org.gradle.api.provider.ListProperty
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
 
-class MergePropertiesTask extends ConventionTask {
+import javax.inject.Inject
+
+abstract class MergePropertiesTask extends DefaultTask {
+
+    @Inject
+    protected abstract FileSystemOperations getFileSystemOperations()
 
     @InputFiles
-    List<File> inputDirectories = []
+    abstract ListProperty<Directory> getInputDirectories()
 
     @OutputDirectory
-    File outputDir
-
-    private NbmPluginExtension netbeansExt() {
-        project.extensions.nbm
-    }
+    abstract DirectoryProperty getOutputDir()
 
     @TaskAction
     void generate() {
+        def outputDir = getOutputDir().get().asFile
+        def inputDirectories = getInputDirectories().get()
+
         if (!outputDir.mkdirs() && !outputDir.isDirectory()) {
             throw new IOException("Failed to create generated resources output at ${outputDir}")
         }
 
-        Set<String> paths = new HashSet<>()
-        for (File input : inputDirectories) {
-            def tree = project.fileTree(dir: input)
+        Set<String> paths = new LinkedHashSet<>()
+        for (Directory directory : inputDirectories) {
+            def tree = directory.asFileTree
             tree.visit { if (!it.file.isDirectory()) paths.add(it.relativePath.pathString) }
         }
 
@@ -35,14 +43,14 @@ class MergePropertiesTask extends ConventionTask {
             dest.mkdirs()
 
             def inputFiles = []
-            for (File input : inputDirectories) {
-                def candidate = new File(input, path)
+            for (def input : inputDirectories) {
+                def candidate = input.file(path).asFile
                 if (candidate.exists())
                     inputFiles.add(candidate)
             }
 
             if (inputFiles.size() == 1) {
-                project.copy {
+                fileSystemOperations.copy {
                     from inputFiles.first()
                     into dest
                 }
