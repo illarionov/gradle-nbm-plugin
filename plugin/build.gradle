@@ -45,9 +45,7 @@ configurations {
 }
 
 dependencies {
-    implementation gradleApi()
     implementation localGroovy()
-    implementation "org.gradle:gradle-tooling-api:${gradle.gradleVersion}"
     implementation "org.codehaus.mojo:nbm-maven-harness:8.2"
     runtimeClasspath 'org.slf4j:slf4j-simple:1.7.5'
 
@@ -65,9 +63,6 @@ dependencies {
     codenarc "org.codehaus.groovy:groovy-all:3.0.9"
 }
 repositories {
-    maven {
-        url 'https://repo.gradle.org/gradle/libs-releases'
-    }
     mavenCentral()
 }
 
@@ -90,6 +85,10 @@ task integTest(type: Test) {
     systemProperty "xml.catalog.files", catalogPath
 
     useJUnitPlatform()
+}
+
+gradlePlugin {
+    testSourceSets sourceSets.integTest
 }
 
 task testJenkins(dependsOn: test) {

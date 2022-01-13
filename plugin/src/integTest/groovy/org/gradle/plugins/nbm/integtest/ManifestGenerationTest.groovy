@@ -1,27 +1,9 @@
 package org.gradle.plugins.nbm.integtest
 
-import org.gradle.tooling.model.GradleProject
-
 import java.nio.file.Path
 
 @SuppressWarnings('BlockStartsWithBlankLine')
 class ManifestGenerationTest extends AbstractIntegrationTest {
-    private static Path getProjectDir(GradleProject project) {
-        return project.getBuildScript().getSourceFile().toPath().parent
-    }
-
-    private static Path getBuildDir(GradleProject project) {
-        return getProjectDir(project).resolve('build')
-    }
-
-    private static Path getGeneratedManifestPath(GradleProject project) {
-        return getBuildDir(project).resolve('generated-manifest.mf')
-    }
-
-    private static Map<String, String> getGeneratedModuleManifest(GradleProject project) {
-        Path manifestPath = getGeneratedManifestPath(project)
-        return ManifestUtils.readManifest(manifestPath)
-    }
 
     def "check default generated manifest file"() {
 
@@ -37,10 +19,10 @@ nbm {
 }
 """
         when: "Generate netbeans module manifest"
-        GradleProject project = runTasks(integTestDir, "generateModuleManifest")
+        runTasks "generateModuleManifest"
 
         then: "Default manifest entries exist with correct values."
-        def manifest = checkDefaultModuleManifest(project)
+        def manifest = checkDefaultModuleManifest()
 
         then: "Entry 'OpenIDE-Module-Public-Packages' exist in manifest with correct value."
         assert '-' == manifest.get('OpenIDE-Module-Public-Packages')
@@ -70,10 +52,10 @@ nbm {
 }
 """
         when: "Generate netbeans module manifest"
-        GradleProject project = runTasks(integTestDir, "generateModuleManifest")
+        runTasks'generateModuleManifest'
 
         then: "Default manifest entries exist with correct values."
-        def manifest = checkDefaultModuleManifest(project)
+        def manifest = checkDefaultModuleManifest()
 
         then: "Entry 'OpenIDE-Module-Layer' exists in manifest with correct value."
         assert 'rootpckg/mypckg/subpckg/layer.xml' == manifest.get('OpenIDE-Module-Layer')
@@ -94,10 +76,10 @@ nbm {
 }
 """
         when: "Generate netbeans module manifest"
-        GradleProject project = runTasks(integTestDir, "generateModuleManifest")
+        runTasks 'generateModuleManifest'
 
         then: "Default manifest entries exist with correct values."
-        def manifest = checkDefaultModuleManifest(project)
+        def manifest = checkDefaultModuleManifest()
 
         then: "Entry 'OpenIDE-Module-Java-Dependencies' exists in manifest with correct value."
         assert manifest.get('OpenIDE-Module-Java-Dependencies') == 'Java > 1.8'
@@ -118,10 +100,10 @@ nbm {
 }
 """
         when: "Generate netbeans module manifest"
-        GradleProject project = runTasks(integTestDir, "generateModuleManifest")
+        runTasks "generateModuleManifest"
 
         then: "Default manifest entries exist with correct values."
-        def manifest = checkDefaultModuleManifest(project)
+        def manifest = checkDefaultModuleManifest()
 
         then: "Entry 'AutoUpdate-Show-In-Client' exist in manifest with correct value."
         assert 'false' == manifest.get('AutoUpdate-Show-In-Client')
@@ -142,10 +124,10 @@ nbm {
 }
 """
         when: "Generate netbeans module manifest"
-        GradleProject project = runTasks(integTestDir, "generateModuleManifest")
+        runTasks"generateModuleManifest"
 
         then: "Default manifest entries exist with correct values."
-        def manifest = checkDefaultModuleManifest(project)
+        def manifest = checkDefaultModuleManifest()
 
         then: "Entry 'OpenIDE-Module-Implementation-Version' exist in manifest with correct value."
         assert manifest.get('OpenIDE-Module-Implementation-Version') == 'myImplVersion'
@@ -168,10 +150,10 @@ nbm {
 }
 """
         when: "Generate netbeans module manifest"
-        GradleProject project = runTasks(integTestDir, "generateModuleManifest")
+        runTasks 'generateModuleManifest'
 
         then: "Default manifest entries exist with correct values."
-        def manifest = checkDefaultModuleManifest(project)
+        def manifest = checkDefaultModuleManifest()
 
         then: "Entry 'OpenIDE-Module-Implementation-Version' exists in manifest with correct value. (timestamp)"
         assert manifest.get('OpenIDE-Module-Implementation-Version') =~ /\d{12}/
@@ -200,10 +182,10 @@ nbm {
         setupDefaultSources()
 
         when:
-        GradleProject project = runTasks(integTestDir, "generateModuleManifest")
+        runTasks'generateModuleManifest'
 
         then:
-        def manifest = checkDefaultModuleManifest(project)
+        def manifest = checkDefaultModuleManifest()
         assert manifest.get('OpenIDE-Module-Public-Packages') == 'rootpckg.mypckg.subpckg.*, rootpckg.mypckg.subpckg3.*'
     }
 
@@ -227,10 +209,10 @@ nbm {
         setupDefaultSources()
 
         when:
-        GradleProject project = runTasks(integTestDir, "generateModuleManifest")
+        runTasks'generateModuleManifest'
 
         then:
-        def manifest = checkDefaultModuleManifest(project)
+        def manifest = checkDefaultModuleManifest()
         assert manifest.get('OpenIDE-Module-Public-Packages') == 'rootpckg.mypckg.subpckg.*, rootpckg.mypckg.subpckg3.*'
     }
 
@@ -255,10 +237,10 @@ nbm {
         setupDefaultSources()
 
         when:
-        GradleProject project = runTasks(integTestDir, "generateModuleManifest")
+        runTasks 'generateModuleManifest'
 
         then:
-        def manifest = checkDefaultModuleManifest(project)
+        def manifest = checkDefaultModuleManifest()
         assert manifest.get('OpenIDE-Module-Public-Packages') == 'rootpckg.mypckg.*, rootpckg.mypckg.subpckg.*'
     }
 
@@ -283,10 +265,10 @@ nbm {
         setupDefaultSources()
 
         when:
-        GradleProject project = runTasks(integTestDir, "generateModuleManifest")
+        runTasks 'generateModuleManifest'
 
         then:
-        def manifest = checkDefaultModuleManifest(project)
+        def manifest = checkDefaultModuleManifest()
         assert manifest.get('OpenIDE-Module-Public-Packages') == 'rootpckg.mypckg.*, rootpckg.mypckg.subpckg.*'
     }
 
@@ -311,10 +293,10 @@ nbm {
         setupDefaultSources()
 
         when:
-        GradleProject project = runTasks(integTestDir, "generateModuleManifest")
+        runTasks 'generateModuleManifest'
 
         then:
-        def manifest = checkDefaultModuleManifest(project)
+        def manifest = checkDefaultModuleManifest()
         assert manifest.get('OpenIDE-Module-Public-Packages') == 'rootpckg.mypckg.**, rootpckg.mypckg.subpckg.**'
     }
 
@@ -332,8 +314,8 @@ public class B { }
 """
     }
 
-    private Map<String, String> checkDefaultModuleManifest(GradleProject project) {
-        Map<String, String> manifest = getGeneratedModuleManifest(project)
+    private Map<String, String> checkDefaultModuleManifest() {
+        Map<String, String> manifest = getGeneratedModuleManifest()
 
         assert manifest.get('Manifest-Version') == '1.0'
         assert manifest.get('OpenIDE-Module-Specification-Version') == '3.5.6'
@@ -342,5 +324,13 @@ public class B { }
         assert manifest.get('Created-By') == 'Gradle NBM plugin'
 
         manifest
+    }
+
+    private Map<String, String> getGeneratedModuleManifest() {
+        ManifestUtils.readManifest(generatedManifestPath)
+    }
+
+    private Path getGeneratedManifestPath() {
+        new File(buildDir, "generated-manifest.mf").toPath()
     }
 }

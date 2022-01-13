@@ -5,7 +5,6 @@ import com.google.common.collect.Iterables
 import com.google.common.io.Files
 import groovy.xml.XmlSlurper
 import groovy.xml.slurpersupport.GPathResult
-import org.gradle.tooling.model.GradleProject
 import org.xml.sax.EntityResolver
 import org.xml.sax.InputSource
 import org.xml.sax.SAXException
@@ -16,6 +15,7 @@ import java.util.jar.Attributes
 import java.util.jar.JarFile
 
 import static org.hamcrest.MatcherAssert.assertThat
+import static org.hamcrest.Matchers.hasItem
 import static org.hamcrest.Matchers.not
 
 class StandaloneNbmProjectTest extends AbstractIntegrationTest {
@@ -27,11 +27,10 @@ apply plugin: org.gradle.plugins.nbm.NbmPlugin
 
 """
         when:
-        GradleProject project = runTasks(integTestDir, "tasks")
+        def result = runTasks 'tasks'
 
         then:
-        project != null
-        project.tasks.find { it.name == 'nbm' } != null
+        result.output =~ /(?m)^nbm\b/
     }
 
     def "run nbm without module name "() {
@@ -42,11 +41,11 @@ apply plugin: org.gradle.plugins.nbm.NbmPlugin
 
 """
         when:
-        runTasks(integTestDir, "nbm")
+        runTasks'nbm'
 
         then:
         def moduleName = integTestDir.name
-        assertThat(new File(getIntegTestDir(), "build/nbm/${moduleName}.nbm"), FileMatchers.exists())
+        assertThat(getInBuildDir("nbm/${moduleName}.nbm"), FileMatchers.exists())
     }
 
     def "run nbm"() {
@@ -60,16 +59,18 @@ nbm {
 }
 """
         when:
-        GradleProject project = runTasks(integTestDir, "nbm")
+        runTasks 'nbm'
 
         then:
         // TODO expect output file with all required entries
-        project != null
-        project.tasks.find { it.name == 'nbm' } != null
-        assertThat(new File(getIntegTestDir(), 'build/module/config/Modules/com-foo-acme.xml'), FileMatchers.exists())
-        assertThat(new File(getIntegTestDir(), 'build/module/modules/com-foo-acme.jar'), FileMatchers.exists())
-        assertThat(new File(getIntegTestDir(), 'build/module/update_tracking/com-foo-acme.xml'), FileMatchers.exists())
-        assertThat(new File(getIntegTestDir(), 'build/nbm/com-foo-acme.nbm'), FileMatchers.exists())
+        [
+            'module/config/Modules/com-foo-acme.xml',
+            'module/modules/com-foo-acme.jar',
+            'module/update_tracking/com-foo-acme.xml',
+            'nbm/com-foo-acme.nbm'
+        ].each {
+            assertThat getInBuildDir(it), FileMatchers.exists()
+        }
     }
 
     def "build signed nbm"() {
@@ -89,12 +90,10 @@ nbm {
 """
         when:
         Files.asByteSink(new File(getIntegTestDir(), 'keystore')).writeFrom(StandaloneNbmProjectTest.getResourceAsStream('keystore'))
-        GradleProject project = runTasks(integTestDir, "nbm")
+        runTasks 'nbm'
 
         then:
-        project != null
-        project.tasks.find { it.name == 'nbm' } != null
-        assertThat(new File(getIntegTestDir(), 'build/nbm/com-foo-acme.nbm'), FileMatchers.exists())
+        assertThat(new File(buildDir, 'nbm/com-foo-acme.nbm'), FileMatchers.exists())
     }
 
     def "build with module dependency"() {
@@ -167,20 +166,22 @@ MyKey=value
 """
 
         when:
-        GradleProject project = runTasks(integTestDir, "netbeans")
-        def moduleJar = new File(getIntegTestDir(), 'build/module/modules/com-foo-acme.jar')
+        runTasks 'netbeans'
+        def moduleJar = getInBuildDir('module/modules/com-foo-acme.jar')
 
         then:
-        project != null
-        project.tasks.find { it.name == 'nbm' } != null
-        assertThat(new File(getIntegTestDir(), 'build/classes/java/main/META-INF/services/com.mycompany.standalone.Service'), FileMatchers.exists())
-        assertThat(new File(getIntegTestDir(), 'build/module/config/Modules/com-foo-acme.xml'), FileMatchers.exists())
-        assertThat(moduleJar, FileMatchers.exists())
-        assertThat(new File(getIntegTestDir(), 'build/module/update_tracking/com-foo-acme.xml'), FileMatchers.exists())
-        assertThat(new File(getIntegTestDir(), 'build/module/.lastModified'), FileMatchers.exists())
+        [
+            'classes/java/main/META-INF/services/com.mycompany.standalone.Service',
+            'module/config/Modules/com-foo-acme.xml',
+            'module/update_tracking/com-foo-acme.xml',
+            'module/.lastModified'
+        ].each {
+            assertThat getInBuildDir(it), FileMatchers.exists()
+        }
 
-        Iterables.contains(moduleDependencies(moduleJar), 'org.openide.util > 9.19')
-        Iterables.contains(moduleDependencies(moduleJar), 'org.openide.awt > 7.80')
+        assertThat moduleJar, FileMatchers.exists()
+        assertThat moduleDependencies(moduleJar), hasItem('org.openide.util > 9.19')
+        assertThat moduleDependencies(moduleJar), hasItem('org.openide.awt > 7.80')
         moduleProperties(moduleJar, 'com/mycompany/standalone/Bundle.properties').getProperty('MyKey') == 'value'
         moduleProperties(moduleJar, 'com/mycompany/standalone/Bundle.properties').getProperty('CTL_HelloAction') == 'Say hello'
     }
@@ -213,15 +214,13 @@ public class Service {
 """
 
         when:
-        GradleProject project = runTasks(integTestDir, "netbeans")
-        def moduleJar = new File(getIntegTestDir(), 'build/module/modules/com-foo-acme.jar')
+        runTasks 'netbeans'
+        def moduleJar = getInBuildDir'module/modules/com-foo-acme.jar'
 
         then:
-        project != null
-        project.tasks.find { it.name == 'nbm' } != null
         assertThat(moduleJar, FileMatchers.exists())
-        assertThat(new File(getIntegTestDir(), 'build/module/modules/ext/slf4j-api-1.7.2.jar'), FileMatchers.exists())
-        assertThat(new File(getIntegTestDir(), "build/module/modules/ext/org-openide-util-lookup-${nbVersion}.jar"), not(FileMatchers.exists()))
+        assertThat(getInBuildDir('module/modules/ext/slf4j-api-1.7.2.jar'), FileMatchers.exists())
+        assertThat(getInBuildDir("module/modules/ext/org-openide-util-lookup-${nbVersion}.jar"), not(FileMatchers.exists()))
 
         Iterables.contains(moduleClasspath(moduleJar), 'ext/slf4j-api-1.7.2.jar')
     }
@@ -255,16 +254,14 @@ public class Service {
 """
 
         when:
-        GradleProject project = runTasks(integTestDir, "netbeans")
-        def moduleJar = new File(getIntegTestDir(), 'build/module/modules/com-foo-acme.jar')
+        runTasks 'netbeans'
+        def moduleJar = getInBuildDir 'module/modules/com-foo-acme.jar'
 
         then:
-        project != null
-        project.tasks.find { it.name == 'nbm' } != null
         assertThat(moduleJar, FileMatchers.exists())
-        assertThat(new File(getIntegTestDir(), 'build/module/modules/ext/acme/slf4j-api-1.7.2.jar'), FileMatchers.exists())
-        assertThat(new File(getIntegTestDir(), "build/module/modules/ext/acme/org-openide-util-lookup-${nbVersion}.jar"), not(FileMatchers.exists()))
-        assertThat(new File(getIntegTestDir(), "build/module/modules/ext/org-openide-util-lookup-${nbVersion}.jar"), not(FileMatchers.exists()))
+        assertThat(getInBuildDir('module/modules/ext/acme/slf4j-api-1.7.2.jar'), FileMatchers.exists())
+        assertThat(getInBuildDir("module/modules/ext/acme/org-openide-util-lookup-${nbVersion}.jar"), not(FileMatchers.exists()))
+        assertThat(getInBuildDir("module/modules/ext/org-openide-util-lookup-${nbVersion}.jar"), not(FileMatchers.exists()))
 
         Iterables.contains(moduleClasspath(moduleJar), 'ext/acme/slf4j-api-1.7.2.jar')
     }
@@ -280,17 +277,20 @@ nbm {
 }
 """
         when:
-        GradleProject project = runTasks(integTestDir, "nbm")
-        File module = new File(getIntegTestDir(), 'build/nbm/com-foo-acme.nbm')
+        runTasks 'nbm'
+        File module = getInBuildDir'nbm/com-foo-acme.nbm'
 
         then:
         // TODO expect output file with all required entries
-        project != null
-        project.tasks.find { it.name == 'nbm' } != null
-        assertThat(new File(getIntegTestDir(), 'build/module/config/Modules/com-foo-acme.xml'), FileMatchers.exists())
-        assertThat(new File(getIntegTestDir(), 'build/module/modules/com-foo-acme.jar'), FileMatchers.exists())
-        assertThat(new File(getIntegTestDir(), 'build/module/update_tracking/com-foo-acme.xml'), FileMatchers.exists())
-        assertThat(module, FileMatchers.exists())
+        [
+            'module/config/Modules/com-foo-acme.xml',
+            'module/modules/com-foo-acme.jar',
+            'module/update_tracking/com-foo-acme.xml'
+        ].each {
+            assertThat getInBuildDir(it), FileMatchers.exists()
+        }
+
+        assertThat module, FileMatchers.exists()
         moduleXml(module, 'Info/info.xml').getProperty('@targetcluster').text().isEmpty()
 
         def moduleXml = moduleXml(module, 'netbeans/config/Modules/com-foo-acme.xml')
@@ -311,17 +311,20 @@ nbm {
 }
 """
         when:
-        GradleProject project = runTasks(integTestDir, "nbm")
-        File module = new File(getIntegTestDir(), 'build/nbm/com-foo-acme.nbm')
+        runTasks 'nbm'
+        File module = getInBuildDir 'nbm/com-foo-acme.nbm'
 
         then:
         // TODO expect output file with all required entries
-        project != null
-        project.tasks.find { it.name == 'nbm' } != null
-        assertThat(new File(getIntegTestDir(), 'build/module/config/Modules/com-foo-acme.xml'), FileMatchers.exists())
-        assertThat(new File(getIntegTestDir(), 'build/module/modules/com-foo-acme.jar'), FileMatchers.exists())
-        assertThat(new File(getIntegTestDir(), 'build/module/update_tracking/com-foo-acme.xml'), FileMatchers.exists())
         assertThat(module, FileMatchers.exists())
+        [
+            'module/config/Modules/com-foo-acme.xml',
+            'module/modules/com-foo-acme.jar',
+            'module/update_tracking/com-foo-acme.xml'
+        ].each {
+            assertThat getInBuildDir(it), FileMatchers.exists()
+        }
+
         moduleXml(module, 'Info/info.xml').getProperty('@targetcluster').text() == "myCluster"
     }
 
@@ -337,17 +340,20 @@ nbm {
 }
 """
         when:
-        GradleProject project = runTasks(integTestDir, "nbm")
-        File module = new File(getIntegTestDir(), 'build/nbm/com-foo-acme.nbm')
+        runTasks 'nbm'
+        File module = getInBuildDir 'nbm/com-foo-acme.nbm'
 
         then:
         // TODO expect output file with all required entries
-        project != null
-        project.tasks.find { it.name == 'nbm' } != null
-        assertThat(new File(getIntegTestDir(), 'build/module/config/Modules/com-foo-acme.xml'), FileMatchers.exists())
-        assertThat(new File(getIntegTestDir(), 'build/module/modules/com-foo-acme.jar'), FileMatchers.exists())
-        assertThat(new File(getIntegTestDir(), 'build/module/update_tracking/com-foo-acme.xml'), FileMatchers.exists())
         assertThat(module, FileMatchers.exists())
+        [
+            'module/config/Modules/com-foo-acme.xml',
+            'module/modules/com-foo-acme.jar',
+            'module/update_tracking/com-foo-acme.xml'
+        ].each {
+            assertThat getInBuildDir(it), FileMatchers.exists()
+        }
+
         moduleXml(module, 'Info/info.xml').getProperty('@targetcluster').text().isEmpty()
     }
 
@@ -363,13 +369,11 @@ nbm {
 }
 """
         when:
-        GradleProject project = runTasks(integTestDir, "nbm")
-        File module = new File(getIntegTestDir(), 'build/nbm/com-foo-acme.nbm')
+        runTasks 'nbm'
+        File module = getInBuildDir('nbm/com-foo-acme.nbm')
 
         then:
-        project != null
-        project.tasks.find { it.name == 'nbm' } != null
-        assertThat(new File(getIntegTestDir(), 'build/module/config/Modules/com-foo-acme.xml'), FileMatchers.exists())
+        assertThat(getInBuildDir('module/config/Modules/com-foo-acme.xml'), FileMatchers.exists())
         def moduleXml = moduleXml(module, 'netbeans/config/Modules/com-foo-acme.xml')
         assert moduleXml.param.find { it.@name == 'autoload' }.toBoolean()
         assert !moduleXml.param.find { it.@name == 'eager' }.toBoolean()
@@ -388,13 +392,11 @@ nbm {
 }
 """
         when:
-        GradleProject project = runTasks(integTestDir, "nbm")
-        File module = new File(getIntegTestDir(), 'build/nbm/com-foo-acme.nbm')
+        runTasks 'nbm'
+        File module = getInBuildDir'nbm/com-foo-acme.nbm'
 
         then:
-        project != null
-        project.tasks.find { it.name == 'nbm' } != null
-        assertThat(new File(getIntegTestDir(), 'build/module/config/Modules/com-foo-acme.xml'), FileMatchers.exists())
+        assertThat(getInBuildDir('module/config/Modules/com-foo-acme.xml'), FileMatchers.exists())
         def moduleXml = moduleXml(module, 'netbeans/config/Modules/com-foo-acme.xml')
 
         assert !moduleXml.param.find { it.@name == 'autoload' }.toBoolean()
@@ -450,12 +452,10 @@ MyKey=value
 """
 
         when:
-        GradleProject project = runTasks(integTestDir, "test")
+        runTasks 'test'
 
         then:
-        project != null
-        project.tasks.find { it.name == 'test' } != null
-        assertThat(new File(getIntegTestDir(), 'build/classes/java/main/com/mycompany/standalone/Bundle.class'), FileMatchers.exists())
+        assertThat(getInBuildDir('classes/java/main/com/mycompany/standalone/Bundle.class'), FileMatchers.exists())
     }
 
     private Iterable<String> moduleDependencies(File jarFile) {

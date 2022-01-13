@@ -16,10 +16,9 @@
 package org.gradle.plugins.nbm.integtest
 
 import org.apache.xml.resolver.CatalogManager
-import org.gradle.tooling.BuildLauncher
-import org.gradle.tooling.GradleConnector
-import org.gradle.tooling.ProjectConnection
-import org.gradle.tooling.model.GradleProject
+import org.gradle.testkit.runner.BuildResult
+import org.gradle.testkit.runner.GradleRunner
+import org.gradle.testkit.runner.TaskOutcome
 import spock.lang.Specification
 
 import java.nio.file.Files
@@ -75,6 +74,14 @@ repositories {
 
     def cleanup() {
         integTestDir.deleteDir()
+    }
+
+    protected File getBuildDir() {
+        new File(integTestDir, "build")
+    }
+
+    protected File getInBuildDir(String child) {
+        new File(buildDir, child)
     }
 
     protected File createNewDir(File parent, String dirname) {
@@ -154,16 +161,23 @@ repositories {
         }
     }
 
-    protected GradleProject runTasks(File projectDir, String... tasks) {
-        ProjectConnection connection = GradleConnector.newConnector().forProjectDirectory(projectDir).connect()
+    protected GradleRunner createGradleRunner(String... tasks) {
+        GradleRunner.create()
+            .withProjectDir(integTestDir)
+            .withArguments(tasks)
+            .withPluginClasspath()
+            .withDebug(true)
+            .forwardOutput()
+    }
 
-        try {
-            BuildLauncher builder = connection.newBuild()
-            builder.forTasks(tasks).run()
-            return connection.getModel(GradleProject)
+    protected BuildResult runTasks(String... tasks) {
+        def result = createGradleRunner(tasks)
+            .build()
+
+        tasks.each {
+            assert result.task(':' + it).outcome in [TaskOutcome.SUCCESS, TaskOutcome.UP_TO_DATE]
         }
-        finally {
-            connection?.close()
-        }
+
+        result
     }
 }
