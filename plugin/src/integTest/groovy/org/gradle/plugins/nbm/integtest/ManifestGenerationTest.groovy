@@ -15,7 +15,7 @@ class ManifestGenerationTest extends AbstractIntegrationTest {
 apply plugin: org.gradle.plugins.nbm.NbmPlugin
 version = '3.5.6'
 nbm {
-  moduleName = 'my-test-project'
+  moduleName = 'my.test.project'
 }
 """
         when: "Generate netbeans module manifest"
@@ -47,7 +47,7 @@ nbm {
 apply plugin: org.gradle.plugins.nbm.NbmPlugin
 version = '3.5.6'
 nbm {
-  moduleName = 'my-test-project'
+  moduleName = 'my.test.project'
   layer = 'rootpckg/mypckg/subpckg/layer.xml'
 }
 """
@@ -71,7 +71,7 @@ nbm {
 apply plugin: org.gradle.plugins.nbm.NbmPlugin
 version = '3.5.6'
 nbm {
-  moduleName = 'my-test-project'
+  moduleName = 'my.test.project'
   javaDependency = 'Java > 1.8'
 }
 """
@@ -95,7 +95,7 @@ nbm {
 apply plugin: org.gradle.plugins.nbm.NbmPlugin
 version = '3.5.6'
 nbm {
-  moduleName = 'my-test-project'
+  moduleName = 'my.test.project'
   autoupdateShowInClient = false
 }
 """
@@ -119,7 +119,7 @@ nbm {
 apply plugin: org.gradle.plugins.nbm.NbmPlugin
 version = '3.5.6'
 nbm {
-  moduleName = 'my-test-project'
+  moduleName = 'my.test.project'
   implementationVersion = 'myImplVersion'
 }
 """
@@ -146,7 +146,7 @@ nbm {
 apply plugin: org.gradle.plugins.nbm.NbmPlugin
 version = '3.5.6'
 nbm {
-  moduleName = 'my-test-project'
+  moduleName = 'my.test.project'
 }
 """
         when: "Generate netbeans module manifest"
@@ -170,7 +170,7 @@ nbm {
 apply plugin: org.gradle.plugins.nbm.NbmPlugin
 version = '3.5.6'
 nbm {
-  moduleName = 'my-test-project'
+  moduleName = 'my.test.project'
   implementationVersion = version
 
   friendPackages {
@@ -197,7 +197,7 @@ nbm {
 apply plugin: org.gradle.plugins.nbm.NbmPlugin
 version = '3.5.6'
 nbm {
-  moduleName = 'my-test-project'
+  moduleName = 'my.test.project'
   implementationVersion = version
 
   friendPackages {
@@ -224,7 +224,7 @@ nbm {
 apply plugin: org.gradle.plugins.nbm.NbmPlugin
 version = '3.5.6'
 nbm {
-  moduleName = 'my-test-project'
+  moduleName = 'my.test.project'
   implementationVersion = version
 
   friendPackages {
@@ -252,7 +252,7 @@ nbm {
 apply plugin: org.gradle.plugins.nbm.NbmPlugin
 version = '3.5.6'
 nbm {
-  moduleName = 'my-test-project'
+  moduleName = 'my.test.project'
   implementationVersion = version
 
   friendPackages {
@@ -280,7 +280,7 @@ nbm {
 apply plugin: org.gradle.plugins.nbm.NbmPlugin
 version = '3.5.6'
 nbm {
-  moduleName = 'my-test-project'
+  moduleName = 'my.test.project'
   implementationVersion = version
 
   friendPackages {
@@ -319,7 +319,7 @@ public class B { }
 
         assert manifest.get('Manifest-Version') == '1.0'
         assert manifest.get('OpenIDE-Module-Specification-Version') == '3.5.6'
-        assert manifest.get('OpenIDE-Module') == 'my-test-project'
+        assert manifest.get('OpenIDE-Module') == 'my.test.project'
         assert manifest.get('OpenIDE-Module-Requires')?.split(',')*.trim().contains('org.openide.modules.ModuleFormat1')
         assert manifest.get('Created-By') == 'Gradle NBM plugin'
 

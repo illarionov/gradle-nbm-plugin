@@ -1,6 +1,7 @@
 package org.gradle.plugins.nbm;
 
 import groovy.lang.Closure;
+import org.gradle.api.InvalidUserDataException;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
 
@@ -10,8 +11,13 @@ import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 public final class NbmPluginExtension {
+    // pattern copied from http://netbeans.org/ns/nb-module-project/3.xsd
+    // (code-name-base) and add optional major version to patter
+    static final Pattern MODULE_NAME_PATTERN = Pattern.compile(
+        "\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*(?:[.]\\p{javaJavaIdentifierPart}+)*(/\\d+)?");
 
     private String moduleName;
     private String cluster;
@@ -164,6 +170,10 @@ public final class NbmPluginExtension {
     }
 
     public void setModuleName(String moduleName) {
+        if (!MODULE_NAME_PATTERN.matcher(moduleName).matches()) {
+            throw new InvalidUserDataException(
+                "Illegal module friend name - '" + moduleName + "' (must match '" + MODULE_NAME_PATTERN + "'");
+        }
         this.moduleName = moduleName;
     }
 
