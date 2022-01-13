@@ -1,6 +1,5 @@
 package org.gradle.plugins.nbm
 
-import com.google.common.collect.Sets
 import org.gradle.api.Project
 import org.gradle.api.Task
 import org.gradle.api.internal.artifacts.configurations.Configurations
@@ -9,6 +8,7 @@ import org.gradle.testfixtures.ProjectBuilder
 import org.junit.jupiter.api.Test
 
 import static org.hamcrest.MatcherAssert.assertThat
+import static org.hamcrest.Matchers.empty
 import static org.hamcrest.Matchers.equalTo
 import static org.junit.jupiter.api.Assertions.assertEquals
 import static org.junit.jupiter.api.Assertions.assertFalse
@@ -41,22 +41,22 @@ public class NbmPluginTest {
 
         def configuration = project.configurations.getByName(JavaPlugin.IMPLEMENTATION_CONFIGURATION_NAME)
         assertThat(Configurations.getNames(configuration.extendsFrom),
-            equalTo(Sets.newHashSet(NbmPlugin.PROVIDED_COMPILE_CONFIGURATION_NAME, NbmPlugin.IMPLEMENTATION_CONFIGURATION_NAME, NbmPlugin.BUNDLE_CONFIGURATION_NAME)))
+            equalTo(Set.of(NbmPlugin.PROVIDED_COMPILE_CONFIGURATION_NAME, NbmPlugin.IMPLEMENTATION_CONFIGURATION_NAME, NbmPlugin.BUNDLE_CONFIGURATION_NAME)))
         assertFalse(configuration.visible)
         assertTrue(configuration.transitive)
 
         configuration = project.configurations.getByName(JavaPlugin.RUNTIME_CLASSPATH_CONFIGURATION_NAME)
-        assertThat(Configurations.getNames(configuration.extendsFrom), equalTo(Sets.newHashSet(JavaPlugin.IMPLEMENTATION_CONFIGURATION_NAME, JavaPlugin.RUNTIME_ONLY_CONFIGURATION_NAME, NbmPlugin.PROVIDED_RUNTIME_CONFIGURATION_NAME)))
+        assertThat(Configurations.getNames(configuration.extendsFrom), equalTo(Set.of(JavaPlugin.IMPLEMENTATION_CONFIGURATION_NAME, JavaPlugin.RUNTIME_ONLY_CONFIGURATION_NAME, NbmPlugin.PROVIDED_RUNTIME_CONFIGURATION_NAME)))
         assertFalse(configuration.visible)
         assertTrue(configuration.transitive)
 
         configuration = project.configurations.getByName(NbmPlugin.PROVIDED_COMPILE_CONFIGURATION_NAME)
-        assertThat(Configurations.getNames(configuration.extendsFrom), equalTo(Sets.newHashSet()))
+        assertThat(Configurations.getNames(configuration.extendsFrom), empty())
         assertFalse(configuration.visible)
         assertTrue(configuration.transitive)
 
         configuration = project.configurations.getByName(NbmPlugin.PROVIDED_RUNTIME_CONFIGURATION_NAME)
-        assertThat(Configurations.getNames(configuration.extendsFrom), equalTo(Sets.newHashSet(NbmPlugin.PROVIDED_COMPILE_CONFIGURATION_NAME)))
+        assertThat(Configurations.getNames(configuration.extendsFrom), equalTo(Set.of(NbmPlugin.PROVIDED_COMPILE_CONFIGURATION_NAME)))
         assertFalse(configuration.visible)
         assertTrue(configuration.transitive)
     }

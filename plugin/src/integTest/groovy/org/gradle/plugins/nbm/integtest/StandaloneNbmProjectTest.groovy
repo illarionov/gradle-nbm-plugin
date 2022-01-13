@@ -1,8 +1,5 @@
 package org.gradle.plugins.nbm.integtest
 
-import com.google.common.base.Splitter
-import com.google.common.collect.Iterables
-import com.google.common.io.Files
 import groovy.xml.XmlSlurper
 import groovy.xml.slurpersupport.GPathResult
 import org.xml.sax.EntityResolver
@@ -11,8 +8,11 @@ import org.xml.sax.SAXException
 
 import javax.xml.parsers.SAXParserFactory
 
+import java.nio.file.Files
 import java.util.jar.Attributes
 import java.util.jar.JarFile
+import java.util.regex.Pattern
+import java.util.stream.Collectors
 
 import static org.hamcrest.MatcherAssert.assertThat
 import static org.hamcrest.Matchers.hasItem
@@ -89,7 +89,9 @@ nbm {
 }
 """
         when:
-        Files.asByteSink(new File(getIntegTestDir(), 'keystore')).writeFrom(StandaloneNbmProjectTest.getResourceAsStream('keystore'))
+        Files.copy(StandaloneNbmProjectTest.getResourceAsStream('keystore'),
+            getIntegTestDir().toPath().resolve('keystore'))
+
         runTasks 'nbm'
 
         then:
@@ -222,7 +224,7 @@ public class Service {
         assertThat(getInBuildDir('module/modules/ext/slf4j-api-1.7.2.jar'), FileMatchers.exists())
         assertThat(getInBuildDir("module/modules/ext/org-openide-util-lookup-${nbVersion}.jar"), not(FileMatchers.exists()))
 
-        Iterables.contains(moduleClasspath(moduleJar), 'ext/slf4j-api-1.7.2.jar')
+        assertThat(moduleClasspath(moduleJar), hasItem('ext/slf4j-api-1.7.2.jar'))
     }
 
     def "build with extra JAR in classpathExtFolder"() {
@@ -263,7 +265,7 @@ public class Service {
         assertThat(getInBuildDir("module/modules/ext/acme/org-openide-util-lookup-${nbVersion}.jar"), not(FileMatchers.exists()))
         assertThat(getInBuildDir("module/modules/ext/org-openide-util-lookup-${nbVersion}.jar"), not(FileMatchers.exists()))
 
-        Iterables.contains(moduleClasspath(moduleJar), 'ext/acme/slf4j-api-1.7.2.jar')
+        assertThat(moduleClasspath(moduleJar), hasItem('ext/acme/slf4j-api-1.7.2.jar'))
     }
 
     def "build with no cluster defined"() {
@@ -463,7 +465,11 @@ MyKey=value
         def attrs = jar.manifest?.mainAttributes
         def attrValue = attrs?.getValue(new Attributes.Name('OpenIDE-Module-Module-Dependencies'))
         jar.close()
-        Splitter.on(',').trimResults().split(attrValue != null ? attrValue : '')
+        Pattern.compile(",")
+            .splitAsStream(attrValue != null ? attrValue : '')
+            .map(String::trim)
+            .filter(s -> !s.isEmpty())
+            .collect(Collectors.toList())
     }
 
     private Iterable<String> moduleClasspath(File jarFile) {
@@ -471,7 +477,11 @@ MyKey=value
         def attrs = jar.manifest?.mainAttributes
         def attrValue = attrs.getValue(new Attributes.Name('Class-Path'))
         jar.close()
-        Splitter.on(',').trimResults().split(attrValue != null ? attrValue : '')
+        Pattern.compile(",")
+            .splitAsStream(attrValue != null ? attrValue : '')
+            .map(String::trim)
+            .filter(s -> !s.isEmpty())
+            .collect(Collectors.toList())
     }
 
     private Properties moduleProperties(File jarFile, String resourceName) {

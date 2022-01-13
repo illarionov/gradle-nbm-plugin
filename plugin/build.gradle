@@ -56,7 +56,6 @@ dependencies {
         exclude module: "groovy-all"
     }
     testImplementation 'org.hamcrest:hamcrest:2.2'
-    testImplementation "com.google.guava:guava:14.0.1"
     testImplementation group: 'xml-resolver', name: 'xml-resolver', version: '1.2'
 
     codenarc "org.codenarc:CodeNarc:2.2.0"
