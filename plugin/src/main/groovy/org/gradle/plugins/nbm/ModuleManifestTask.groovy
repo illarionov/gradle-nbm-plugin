@@ -52,47 +52,7 @@ class ModuleManifestTask extends ConventionTask {
     }
 
     private Map<String, String> getManifestEntries() {
-        Map<String, String> result = new HashMap<String, String>()
-
-        Map<String, String> moduleDeps = new HashMap<>()
-
-        def mainSourceSet = project.sourceSets.main
-        def compileConfig = project.configurations.findByName(mainSourceSet.runtimeClasspathConfigurationName).resolvedConfiguration
-
-        HashSet<ResolvedArtifact> implArtifacts = new HashSet<>()
-        project.configurations.nbimplementation.resolvedConfiguration.firstLevelModuleDependencies.each { ResolvedDependency it ->
-            implArtifacts.addAll(it.moduleArtifacts)
-        }
-
-        HashSet<ResolvedArtifact> bundleArtifacts = new HashSet<>()
-        project.configurations.bundle.resolvedConfiguration.firstLevelModuleDependencies.each { ResolvedDependency it ->
-            bundleArtifacts.addAll(it.moduleArtifacts)
-        }
-
-        compileConfig.firstLevelModuleDependencies.each { ResolvedDependency it ->
-            // println 'module ' + it.name + ', ' + it.id.id
-            it.moduleArtifacts.each { a ->
-                // println '  artifact ' + a + ' file ' + a.file
-                if (a.file?.exists() && 'jar' == a.extension) {
-                    JarFile jar = new JarFile(a.file)
-                    def attrs = jar.manifest?.mainAttributes
-                    def bundleName = attrs?.getValue(new Attributes.Name('Bundle-SymbolicName'))
-                    if (bundleName && bundleArtifacts.contains(a)) {
-                        moduleDeps.put(bundleName.split(';').first(), '')
-                    } else {
-                        def moduleName = attrs?.getValue(new Attributes.Name('OpenIDE-Module'))
-                        def moduleVersion = attrs?.getValue(new Attributes.Name('OpenIDE-Module-Specification-Version'))
-                        def implVersion = attrs?.getValue(new Attributes.Name('OpenIDE-Module-Implementation-Version'))
-                        if (moduleName && moduleVersion) {
-                            if (implArtifacts.contains(a))
-                                moduleDeps.put(moduleName, " = $implVersion")
-                            else
-                                moduleDeps.put(moduleName, " > $moduleVersion")
-                        }
-                    }
-                }
-            }
-        }
+        Map<String, String> result = new LinkedHashMap<>()
 
         result.put('Manifest-Version', '1.0')
 
@@ -101,6 +61,7 @@ class ModuleManifestTask extends ConventionTask {
             result.put('Class-Path', classpath)
         }
 
+        def moduleDeps = computeModuleDependencies()
         if (!moduleDeps.isEmpty())
             result.put(
                 'OpenIDE-Module-Module-Dependencies',
@@ -132,10 +93,7 @@ class ModuleManifestTask extends ConventionTask {
 
         def packageList = netbeansExt().friendPackages.packageListPattern
         if (!packageList.isEmpty()) {
-            Set packageListSet = new HashSet(packageList)
-            def packages = packageListSet.toArray()
-            Arrays.sort(packages) // because why not
-            result.put('OpenIDE-Module-Public-Packages', packages.join(', '))
+            result.put('OpenIDE-Module-Public-Packages', packageList.sort().join(', '))
         } else {
             result.put('OpenIDE-Module-Public-Packages', '-')
         }
@@ -160,10 +118,50 @@ class ModuleManifestTask extends ConventionTask {
         return result
     }
 
-    private Manifest getManifest() {
-        // TODO: It would be nice to output manifest entries in the order they
-        //   were specified.
+    private Map<String, String> computeModuleDependencies() {
+        Map<String, String> moduleDeps = new TreeMap()
 
+        def mainSourceSet = project.sourceSets.main
+        def compileConfig = project.configurations.findByName(mainSourceSet.runtimeClasspathConfigurationName).resolvedConfiguration
+
+        Set<ResolvedArtifact> implArtifacts = new HashSet<>()
+        project.configurations.nbimplementation.resolvedConfiguration.firstLevelModuleDependencies.each { ResolvedDependency it ->
+            implArtifacts.addAll(it.moduleArtifacts)
+        }
+
+        Set<ResolvedArtifact> bundleArtifacts = new HashSet<>()
+        project.configurations.bundle.resolvedConfiguration.firstLevelModuleDependencies.each { ResolvedDependency it ->
+            bundleArtifacts.addAll(it.moduleArtifacts)
+        }
+
+        compileConfig.firstLevelModuleDependencies.each { ResolvedDependency it ->
+            // println 'module ' + it.name + ', ' + it.id.id
+            it.moduleArtifacts.each { a ->
+                // println '  artifact ' + a + ' file ' + a.file
+                if (a.file?.exists() && 'jar' == a.extension) {
+                    JarFile jar = new JarFile(a.file)
+                    def attrs = jar.manifest?.mainAttributes
+                    def bundleName = attrs?.getValue(new Attributes.Name('Bundle-SymbolicName'))
+                    if (bundleName && bundleArtifacts.contains(a)) {
+                        moduleDeps.put(bundleName.split(';').first(), '')
+                    } else {
+                        def moduleName = attrs?.getValue(new Attributes.Name('OpenIDE-Module'))
+                        def moduleVersion = attrs?.getValue(new Attributes.Name('OpenIDE-Module-Specification-Version'))
+                        def implVersion = attrs?.getValue(new Attributes.Name('OpenIDE-Module-Implementation-Version'))
+                        if (moduleName && moduleVersion) {
+                            if (implArtifacts.contains(a))
+                                moduleDeps.put(moduleName, " = $implVersion")
+                            else
+                                moduleDeps.put(moduleName, " > $moduleVersion")
+                        }
+                    }
+                }
+            }
+        }
+        moduleDeps
+    }
+
+    private Manifest createManifest() {
         def manifest = new Manifest()
         def mainAttributes = manifest.mainAttributes
 
@@ -181,7 +179,7 @@ class ModuleManifestTask extends ConventionTask {
 
         def os = new FileOutputStream(manifestFile)
         try {
-            getManifest().write(os)
+            createManifest().write(os)
         } finally {
             os.close()
         }
