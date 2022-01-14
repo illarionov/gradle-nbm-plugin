@@ -10,9 +10,6 @@ import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
 
 class NbmTask extends ConventionTask {
-    public NbmTask() {
-        outputs.upToDateWhen { false }
-    }
 
     @OutputFile
     File getOutputFile() {
