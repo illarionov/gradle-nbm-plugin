@@ -3,8 +3,10 @@ package org.gradle.plugins.nbm.integtest
 import groovy.xml.XmlSlurper
 import groovy.xml.slurpersupport.GPathResult
 import org.xml.sax.EntityResolver
+import org.xml.sax.ErrorHandler
 import org.xml.sax.InputSource
 import org.xml.sax.SAXException
+import org.xml.sax.SAXParseException
 
 import javax.xml.parsers.SAXParserFactory
 
@@ -34,6 +36,9 @@ apply plugin: org.gradle.plugins.nbm.NbmPlugin
     }
 
     def "run nbm without module name "() {
+        def moduleName = integTestDir.name
+        File module = getInBuildDir"nbm/${moduleName}.nbm"
+
         buildFile << \
 """
 apply plugin: 'java'
@@ -44,8 +49,12 @@ apply plugin: org.gradle.plugins.nbm.NbmPlugin
         runTasks'nbm'
 
         then:
-        def moduleName = integTestDir.name
-        assertThat(getInBuildDir("nbm/${moduleName}.nbm"), FileMatchers.exists())
+        assertThat(module, FileMatchers.exists())
+
+        then:
+        def manifest = validateModuleInfoXml(module).manifest
+        assert manifest['@OpenIDE-Module'].text() == moduleName.replace('-', '.')
+        assert manifest['@OpenIDE-Module-Name'].text() == moduleName.replace('-', '.')
     }
 
     def "run nbm"() {
@@ -60,6 +69,7 @@ nbm {
 """
         when:
         runTasks 'nbm'
+        File module = getInBuildDir'nbm/com-foo-acme.nbm'
 
         then:
         // TODO expect output file with all required entries
@@ -67,10 +77,17 @@ nbm {
             'module/config/Modules/com-foo-acme.xml',
             'module/modules/com-foo-acme.jar',
             'module/update_tracking/com-foo-acme.xml',
-            'nbm/com-foo-acme.nbm'
         ].each {
             assertThat getInBuildDir(it), FileMatchers.exists()
         }
+
+        then:
+        assertThat module, FileMatchers.exists()
+
+        then:
+        def manifest = validateModuleInfoXml(module).manifest
+        assert manifest['@OpenIDE-Module'].text() == 'com.foo.acme'
+        assert manifest['@OpenIDE-Module-Name'].text() == 'com.foo.acme'
     }
 
     def "build signed nbm"() {
@@ -96,6 +113,118 @@ nbm {
 
         then:
         assertThat(new File(buildDir, 'nbm/com-foo-acme.nbm'), FileMatchers.exists())
+    }
+
+    def "build with user manifest"() {
+        buildFile << \
+"""
+apply plugin: 'java'
+apply plugin: org.gradle.plugins.nbm.NbmPlugin
+
+nbm {
+  moduleName = 'com.foo.acme'
+}
+"""
+        def manifestFile = createProjectFile('src', 'main', 'nbm', 'manifest.mf')
+        manifestFile << \
+"""
+Manifest-Version: 1.0
+OpenIDE-Module-Name: Com Foo Acme Project
+OpenIDE-Module-Short-Description: Test project
+OpenIDE-Module-Display-Category: Test Display Category
+""".trim()
+
+        when:
+        runTasks 'nbm'
+        File module = getInBuildDir'nbm/com-foo-acme.nbm'
+
+        then:
+        assertThat module, FileMatchers.exists()
+
+        then:
+        def manifest = validateModuleInfoXml(module).manifest
+        assert manifest['@OpenIDE-Module'].text() == 'com.foo.acme'
+        assert manifest['@OpenIDE-Module-Name'].text() == 'Com Foo Acme Project'
+        assert manifest['@OpenIDE-Module-Short-Description'].text() == 'Test project'
+        assert manifest['@OpenIDE-Module-Display-Category'].text() == 'Test Display Category'
+    }
+
+    def "build with manifest entries defined in jar attributes block"() {
+        buildFile << \
+"""
+apply plugin: 'java'
+apply plugin: org.gradle.plugins.nbm.NbmPlugin
+
+jar {
+    manifest {
+        attributes(
+            'OpenIDE-Module-Name': 'Com Foo Acme Project',
+            'OpenIDE-Module-Short-Description': 'Test project',
+            'OpenIDE-Module-Display-Category': 'Test Display Category'
+        )
+    }
+}
+
+nbm {
+  moduleName = 'com.foo.acme'
+}
+"""
+
+        when:
+        runTasks 'nbm'
+        File module = getInBuildDir'nbm/com-foo-acme.nbm'
+
+        then:
+        assertThat module, FileMatchers.exists()
+
+        then:
+        def manifest = validateModuleInfoXml(module).manifest
+        assert manifest['@OpenIDE-Module'].text() == 'com.foo.acme'
+        assert manifest['@OpenIDE-Module-Name'].text() == 'Com Foo Acme Project'
+        assert manifest['@OpenIDE-Module-Short-Description'].text() == 'Test project'
+        assert manifest['@OpenIDE-Module-Display-Category'].text() == 'Test Display Category'
+    }
+
+    def "build with manifest entries defined in jar attributes block and manifest file"() {
+        buildFile << \
+"""
+apply plugin: 'java'
+apply plugin: org.gradle.plugins.nbm.NbmPlugin
+
+jar {
+    manifest {
+        attributes(
+            'OpenIDE-Module-Name': 'Com Foo Acme Project',
+            'OpenIDE-Module-Display-Category': 'Test Display Category'
+        )
+    }
+}
+
+nbm {
+  moduleName = 'com.foo.acme'
+}
+"""
+        def manifestFile = createProjectFile('src', 'main', 'nbm', 'manifest.mf')
+        manifestFile << \
+"""
+Manifest-Version: 1.0
+OpenIDE-Module-Name: Manifest Entry Com Foo Acme Project
+OpenIDE-Module-Short-Description: Manifest Entry Test project
+""".trim()
+
+        when:
+        runTasks 'nbm'
+        File module = getInBuildDir'nbm/com-foo-acme.nbm'
+
+        then:
+        assertThat module, FileMatchers.exists()
+
+        then:
+        def manifest = validateModuleInfoXml(module).manifest
+        assert manifest['@OpenIDE-Module'].text() == 'com.foo.acme'
+        assert manifest['@OpenIDE-Module-Name'].text() == 'Manifest Entry Com Foo Acme Project'
+        assert manifest['@OpenIDE-Module-Short-Description'].text() == 'Manifest Entry Test project'
+        assert manifest['@OpenIDE-Module-Display-Category'].text() == 'Test Display Category'
     }
 
     def "build with module dependency"() {
@@ -293,8 +422,12 @@ nbm {
         }
 
         assertThat module, FileMatchers.exists()
-        moduleXml(module, 'Info/info.xml').getProperty('@targetcluster').text().isEmpty()
 
+        then:
+        def moduleInfoXml = validateModuleInfoXml(module)
+        assert moduleInfoXml['@targetcluster'].text().isEmpty()
+
+        then:
         def moduleXml = moduleXml(module, 'netbeans/config/Modules/com-foo-acme.xml')
         assert !moduleXml.param.find { it.@name == 'autoload' }.toBoolean()
         assert !moduleXml.param.find { it.@name == 'eager' }.toBoolean()
@@ -327,7 +460,9 @@ nbm {
             assertThat getInBuildDir(it), FileMatchers.exists()
         }
 
-        moduleXml(module, 'Info/info.xml').getProperty('@targetcluster').text() == "myCluster"
+        then:
+        def moduleInfoXml = validateModuleInfoXml(module)
+        assert moduleInfoXml['@targetcluster'].text() == 'myCluster'
     }
 
     def "build with cluster defined that is called 'extra'"() {
@@ -356,7 +491,9 @@ nbm {
             assertThat getInBuildDir(it), FileMatchers.exists()
         }
 
-        moduleXml(module, 'Info/info.xml').getProperty('@targetcluster').text().isEmpty()
+        then:
+        def moduleXml = validateModuleInfoXml(module)
+        assert moduleXml['@targetcluster'].text().isEmpty()
     }
 
     def "build autoload module"() {
@@ -494,10 +631,15 @@ MyKey=value
         props
     }
 
-    private GPathResult moduleXml(File jarFile, String resourceName) {
+    private GPathResult validateModuleInfoXml(File jarFile) {
+        moduleXml(jarFile, 'Info/info.xml', true)
+    }
+
+    private GPathResult moduleXml(File jarFile, String resourceName, Boolean validating = true) {
         new JarFile(jarFile).withCloseable { jar ->
             jar.getInputStream(jar.getEntry(resourceName)).withCloseable { is ->
                 def factory = SAXParserFactory.newInstance()
+                factory.validating = validating
 
                 // Don't lookup external resources - relying on some external resource to fetch over and
                 // over isn't ideal from a stability standpoint.
@@ -510,9 +652,27 @@ MyKey=value
                         return new InputSource(localCopy)
                     }
                 }
+                def errorHandler = new ErrorHandler() {
+
+                    @Override
+                    void warning(SAXParseException exception) throws SAXException {
+                        throw exception
+                    }
+
+                    @Override
+                    void error(SAXParseException exception) throws SAXException {
+                        throw exception
+                    }
+
+                    @Override
+                    void fatalError(SAXParseException exception) throws SAXException {
+                        throw exception
+                    }
+                }
 
                 def reader = factory.newSAXParser().getXMLReader()
                 reader.entityResolver = resolver
+                reader.errorHandler = errorHandler
 
                 return new XmlSlurper(reader).parse(is)
             }

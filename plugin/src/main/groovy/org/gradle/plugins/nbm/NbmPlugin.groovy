@@ -69,11 +69,18 @@ public class NbmPlugin implements Plugin<Project> {
 
         ModuleManifestTask manifestTask = project.tasks.create(MANIFEST_TASK, ModuleManifestTask)
         def userManifest = project.file('src' + File.separator + 'main' + File.separator + 'nbm' + File.separator + 'manifest.mf')
-        if (userManifest.exists()) {
-            project.tasks.jar.manifest.from { userManifest }
+        project.tasks.jar.configure { jar ->
+            if (userManifest.exists()) {
+                jar.manifest.from { userManifest }
+            }
+            jar.manifest.from { manifestTask.getGeneratedManifestFile() }
+            jar.dependsOn(manifestTask)
+            project.afterEvaluate {
+                if (!jar.manifest.attributes.containsKey('OpenIDE-Module-Name')) {
+                    jar.manifest.attributes['OpenIDE-Module-Name'] = project.extensions.nbm.moduleName
+                }
+            }
         }
-        project.tasks.jar.manifest.from { manifestTask.getGeneratedManifestFile() }
-        project.tasks.jar.dependsOn(manifestTask)
 
         NetBeansTask netbeansTask = project.tasks.create(NETBEANS_TASK, NetBeansTask)
         netbeansTask.dependsOn(project.tasks.jar)
