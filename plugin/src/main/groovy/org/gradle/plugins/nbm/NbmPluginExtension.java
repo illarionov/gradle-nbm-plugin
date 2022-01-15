@@ -4,6 +4,8 @@ import groovy.lang.Closure;
 import org.gradle.api.InvalidUserDataException;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
+import org.gradle.api.provider.Property;
+import org.gradle.api.provider.Provider;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
@@ -34,6 +36,7 @@ public final class NbmPluginExtension {
     private final ModuleFriendsList moduleFriends;
     private File licenseFile;
     private String moduleAuthor;
+    private final Property<String> distribution;
     private String homePage;
     private Boolean needsRestart;
     private String layer;
@@ -68,6 +71,9 @@ public final class NbmPluginExtension {
         this.requires = new LinkedList<>();
         this.classpathExtFolder = null;
         this.autoupdateShowInClient = true;
+
+        this.distribution = project.getObjects().property(String.class);
+        distribution.convention(project.provider(() -> getModuleName().replace('.', '-') + ".nbm"));
 
         // Initializse default values
         this.buildDate = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date(System.currentTimeMillis()));
@@ -128,6 +134,18 @@ public final class NbmPluginExtension {
 
     public void setHomePage(String homePage) {
         this.homePage = homePage;
+    }
+
+    public Property<String> getDistribution() {
+        return distribution;
+    }
+
+    public void setDistribution(String url) {
+        distribution.set(url);
+    }
+
+    public void setDistributionUrl(Provider<? extends String> urlProvider) {
+        distribution.set(urlProvider);
     }
 
     public String getModuleAuthor() {

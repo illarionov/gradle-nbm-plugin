@@ -61,6 +61,11 @@ class NbmTask extends ConventionTask {
             makenbm.homepage = homePage
         }
 
+        String distribution = nbm.distribution.get()
+        if (distribution != null) {
+            makenbm.distribution = distribution
+        }
+
         Boolean needsRestart = nbm.needsRestart
         if (needsRestart != null) {
             makenbm.needsrestart = needsRestart.toString()

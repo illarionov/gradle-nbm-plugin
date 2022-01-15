@@ -52,9 +52,11 @@ apply plugin: org.gradle.plugins.nbm.NbmPlugin
         assertThat(module, FileMatchers.exists())
 
         then:
-        def manifest = validateModuleInfoXml(module).manifest
-        assert manifest['@OpenIDE-Module'].text() == moduleName.replace('-', '.')
-        assert manifest['@OpenIDE-Module-Name'].text() == moduleName.replace('-', '.')
+        def moduleInfoXml = validateModuleInfoXml(module)
+        assert moduleInfoXml.manifest['@OpenIDE-Module'].text() == moduleName.replace('-', '.')
+        assert moduleInfoXml.manifest['@OpenIDE-Module-Name'].text() == moduleName.replace('-', '.')
+        assert moduleInfoXml['@codenamebase'].text() == moduleName.replace('-', '.')
+        assert moduleInfoXml['@distribution'].text() == moduleName + '.nbm'
     }
 
     def "run nbm"() {
@@ -85,9 +87,11 @@ nbm {
         assertThat module, FileMatchers.exists()
 
         then:
-        def manifest = validateModuleInfoXml(module).manifest
-        assert manifest['@OpenIDE-Module'].text() == 'com.foo.acme'
-        assert manifest['@OpenIDE-Module-Name'].text() == 'com.foo.acme'
+        def moduleInfoXml = validateModuleInfoXml(module)
+        assert moduleInfoXml.manifest['@OpenIDE-Module'].text() == 'com.foo.acme'
+        assert moduleInfoXml.manifest['@OpenIDE-Module-Name'].text() == 'com.foo.acme'
+        assert moduleInfoXml['@codenamebase'].text() == 'com.foo.acme'
+        assert moduleInfoXml['@distribution'].text() == 'com-foo-acme.nbm'
     }
 
     def "build signed nbm"() {
@@ -494,6 +498,34 @@ nbm {
         then:
         def moduleXml = validateModuleInfoXml(module)
         assert moduleXml['@targetcluster'].text().isEmpty()
+    }
+
+    def "build with distribution URL defined"() {
+        buildFile << \
+"""
+apply plugin: 'java'
+apply plugin: org.gradle.plugins.nbm.NbmPlugin
+
+nbm {
+  moduleName = 'com.foo.acme'
+  distribution = 'https://acme.foo.com/com-foo-acme.nbm'
+}
+"""
+        when:
+        runTasks 'nbm'
+        File module = getInBuildDir'nbm/com-foo-acme.nbm'
+
+        then:
+
+        then:
+        assertThat module, FileMatchers.exists()
+
+        then:
+        def moduleInfoXml = validateModuleInfoXml(module)
+        assert moduleInfoXml.manifest['@OpenIDE-Module'].text() == 'com.foo.acme'
+        assert moduleInfoXml.manifest['@OpenIDE-Module-Name'].text() == 'com.foo.acme'
+        assert moduleInfoXml['@codenamebase'].text() == 'com.foo.acme'
+        assert moduleInfoXml['@distribution'].text() == 'https://acme.foo.com/com-foo-acme.nbm'
     }
 
     def "build autoload module"() {
