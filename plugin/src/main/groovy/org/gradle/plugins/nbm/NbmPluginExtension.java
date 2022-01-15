@@ -41,7 +41,7 @@ public final class NbmPluginExtension {
     private Boolean needsRestart;
     private String layer;
     private String javaDependency;
-    private boolean autoupdateShowInClient;
+    private final Property<Boolean> autoupdateShowInClient;
     private final Configuration harnessConfiguration;
     private String classpathExtFolder;
     private final String buildDate;
@@ -70,7 +70,7 @@ public final class NbmPluginExtension {
         this.keyStore = new NbmKeyStoreDef();
         this.requires = new LinkedList<>();
         this.classpathExtFolder = null;
-        this.autoupdateShowInClient = true;
+        this.autoupdateShowInClient = project.getObjects().property(Boolean.class);
 
         this.distribution = project.getObjects().property(String.class);
         distribution.convention(project.provider(() -> getModuleName().replace('.', '-') + ".nbm"));
@@ -278,12 +278,16 @@ public final class NbmPluginExtension {
         this.javaDependency = javaDependency;
     }
 
-    public boolean getAutoupdateShowInClient() {
+    public Provider<Boolean> getAutoupdateShowInClient() {
         return autoupdateShowInClient;
     }
 
     public void setAutoupdateShowInClient(boolean autoupdateShowInClient) {
-        this.autoupdateShowInClient = autoupdateShowInClient;
+        this.autoupdateShowInClient.set(autoupdateShowInClient);
+    }
+
+    public void setAutoupdateShowInClient(Provider<? extends Boolean> autoupdateShowInClientProvider) {
+        this.autoupdateShowInClient.set(autoupdateShowInClientProvider);
     }
 
     public String getClasspathExtFolder() {

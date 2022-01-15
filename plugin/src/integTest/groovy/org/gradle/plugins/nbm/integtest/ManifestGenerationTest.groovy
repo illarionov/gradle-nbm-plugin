@@ -31,9 +31,6 @@ nbm {
         then: "Entry 'OpenIDE-Module-Public-Packages' exist in manifest with correct value."
         assert '-' == manifest.get('OpenIDE-Module-Public-Packages')
 
-        then: "Entry 'AutoUpdate-Show-In-Client' exist in manifest with correct value."
-        assert manifest.get('AutoUpdate-Show-In-Client')
-
         then: "Entry 'OpenIDE-Module-Implementation-Version' exist in manifest with correct value."
         assert manifest.get('OpenIDE-Module-Implementation-Version') =~ /\d{12}/
 
@@ -92,15 +89,15 @@ nbm {
     def "manifest file with autoupdateShowInClient"() {
 
         given: "Build file with configured nbm plugin"
-        // Set the moduleName because I have no idea what the project's name is,
-        // so can't rely on the default value for that
+
+        def showInClientParam = autoupdateShowInClient != null ? "autoupdateShowInClient = ${autoupdateShowInClient}" : ""
         buildFile << \
 """
 apply plugin: org.gradle.plugins.nbm.NbmPlugin
 version = '3.5.6'
 nbm {
   moduleName = 'my.test.project'
-  autoupdateShowInClient = false
+  $showInClientParam
 }
 """
         when: "Generate netbeans module manifest"
@@ -110,7 +107,13 @@ nbm {
         def manifest = checkDefaultModuleManifest()
 
         then: "Entry 'AutoUpdate-Show-In-Client' exist in manifest with correct value."
-        assert 'false' == manifest.get('AutoUpdate-Show-In-Client')
+        assert expectedManifestValue == manifest.get('AutoUpdate-Show-In-Client')
+
+        where:
+        autoupdateShowInClient | expectedManifestValue
+        true                   | 'true'
+        false                  | 'false'
+        null                   | null
     }
 
     def "manifest file with configured implementation version and build version"() {

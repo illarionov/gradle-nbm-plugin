@@ -134,7 +134,10 @@ class ModuleManifestTask extends ConventionTask {
             result.put('OpenIDE-Module-Java-Dependencies', javaDependency)
         }
 
-        result.put('AutoUpdate-Show-In-Client', String.valueOf(netbeansExt().autoupdateShowInClient))
+        def autoupdateShowInClient = netbeansExt().autoupdateShowInClient.getOrNull()
+        if (autoupdateShowInClient != null) {
+            result.put('AutoUpdate-Show-In-Client', autoupdateShowInClient.toString())
+        }
 
         def moduleInstall = netbeansExt().moduleInstall
         if (moduleInstall) {
