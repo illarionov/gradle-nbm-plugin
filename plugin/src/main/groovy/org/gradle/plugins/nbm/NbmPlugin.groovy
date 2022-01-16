@@ -65,6 +65,9 @@ public class NbmPlugin implements Plugin<Project> {
                         BUNDLE_CONFIGURATION_NAME);
                     return runtimeClasspath.minus(providedRuntime).minus(implementation).minus(bundle);
                 });
+                NbmPluginExtension extension = project.extensions.nbm
+                task.generateLastModified = extension.generateLastModifiedFile
+                task.lastModifiedTimestampProvider = extension.lastModifiedTimestampProvider
             }
         });
 

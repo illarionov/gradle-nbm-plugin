@@ -50,6 +50,8 @@ public final class NbmPluginExtension {
     private final Property<Boolean> autoupdateShowInClient;
     private final Configuration harnessConfiguration;
     private String classpathExtFolder;
+    private final Property<Boolean> generateLastModifiedFile;
+    private final Provider<Long> lastModifiedTimestampProvider;
 
     private final Clock clock;
     private Instant buildTimestamp;
@@ -95,6 +97,9 @@ public final class NbmPluginExtension {
 
         this.distribution = objects.property(String.class);
         distribution.convention(providers.provider(() -> getModuleName().replace('.', '-') + ".nbm"));
+
+        this.generateLastModifiedFile = objects.property(Boolean.class).convention(true);
+        this.lastModifiedTimestampProvider = providers.provider(() -> getBuildTimestamp().toEpochMilli());
 
         requires("org.openide.modules.ModuleFormat1");
     }
@@ -328,6 +333,23 @@ public final class NbmPluginExtension {
 
     public void setClasspathExtFolder(String classpathExtFolder) {
         this.classpathExtFolder = classpathExtFolder;
+    }
+
+    public Property<Boolean> getGenerateLastModifiedFile() {
+        return generateLastModifiedFile;
+    }
+
+    public void setGenerateLastModifiedFile(boolean generateLastModified) {
+        this.generateLastModifiedFile.set(generateLastModified);
+    }
+
+    public void setGenerateLastModifiedFile(Provider<Boolean> generateLastModifiedProvider) {
+        this.generateLastModifiedFile.set(generateLastModifiedProvider);
+    }
+
+    Provider<Long> getLastModifiedTimestampProvider() {
+        return project.getProviders().zip(generateLastModifiedFile, lastModifiedTimestampProvider,
+            (enabled, timestamp) -> enabled ? timestamp : 0);
     }
 
     private synchronized Instant getBuildTimestamp() {

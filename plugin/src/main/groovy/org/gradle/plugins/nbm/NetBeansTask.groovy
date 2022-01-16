@@ -7,8 +7,11 @@ import org.gradle.api.file.CopySpec
 import org.gradle.api.file.FileCollection
 import org.gradle.api.file.FileTreeElement
 import org.gradle.api.internal.ConventionTask
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
@@ -16,13 +19,20 @@ import org.gradle.api.tasks.TaskAction
 import java.util.jar.Attributes
 import java.util.jar.JarFile
 
-class NetBeansTask extends ConventionTask {
+abstract class NetBeansTask extends ConventionTask {
     public static final String TEST_USER_DIR_NAME = 'testuserdir'
 
     private FileCollection classpath
 
     @OutputDirectory
     File moduleBuildDir
+
+    @Input
+    @Optional
+    abstract Property<Boolean> getGenerateLastModified()
+
+    @Internal
+    abstract Property<Long> getLastModifiedTimestampProvider()
 
     private NbmPluginExtension netbeansExt() {
         project.extensions.nbm
@@ -73,10 +83,12 @@ class NetBeansTask extends ConventionTask {
             moduleDir.mkdirs()
         }
         def timestamp = new File(moduleDir, ".lastModified")
-        if (timestamp.exists()) {
-            timestamp.setLastModified(System.currentTimeMillis())
-        } else {
+        if (generateLastModified.getOrElse(true)) {
             timestamp.createNewFile()
+            long newTimestamp = lastModifiedTimestampProvider.getOrNull() ?: System.currentTimeMillis();
+            timestamp.setLastModified(newTimestamp)
+        } else {
+            timestamp.delete()
         }
 
         def modulesDir = new File(moduleDir, 'modules')
