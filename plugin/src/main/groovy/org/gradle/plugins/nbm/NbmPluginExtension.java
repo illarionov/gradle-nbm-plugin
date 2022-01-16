@@ -4,14 +4,19 @@ import groovy.lang.Closure;
 import org.gradle.api.InvalidUserDataException;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
+import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.provider.Property;
 import org.gradle.api.provider.Provider;
+import org.gradle.api.provider.ProviderFactory;
 
 import java.io.File;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
@@ -23,8 +28,9 @@ public final class NbmPluginExtension {
 
     private String moduleName;
     private String cluster;
-    private String specificationVersion;
-    private String implementationVersion;
+    private final Property<String> specificationVersion;
+    private final Property<String> implementationVersion;
+    private final Property<String> buildVersion;
     private boolean eager;
     private boolean autoload;
     private final NbmKeyStoreDef keyStore;
@@ -44,19 +50,34 @@ public final class NbmPluginExtension {
     private final Property<Boolean> autoupdateShowInClient;
     private final Configuration harnessConfiguration;
     private String classpathExtFolder;
-    private final String buildDate;
 
-    public NbmPluginExtension(Project project) {
+    private final Clock clock;
+    private Instant buildTimestamp;
+
+    public NbmPluginExtension(Project project, Clock clock) {
         Objects.requireNonNull(project, "project");
         this.project = project;
+        this.clock = clock;
+        final ObjectFactory objects = project.getObjects();
+        final ProviderFactory providers = project.getProviders();
 
         this.harnessConfiguration = project.getConfigurations()
             .detachedConfiguration(project.getDependencies().create("org.codehaus.mojo:nbm-maven-harness:8.2"));
 
         this.moduleName = null;
         this.cluster = null;
-        this.specificationVersion = null;
-        this.implementationVersion = null;
+
+        this.specificationVersion = objects.property(String.class);
+        this.implementationVersion = objects.property(String.class);
+        this.buildVersion = objects.property(String.class);
+        this.specificationVersion.convention(providers.provider(() -> {
+            return EvaluateUtils.asString(project.getVersion());
+        }));
+        buildVersion.convention(providers.provider(() -> {
+            return DateTimeFormatter.ofPattern("yyyyMMddHHmss", Locale.ROOT).withZone(ZoneOffset.UTC)
+                .format(getBuildTimestamp());
+        }));
+
         this.localizingBundle = null;
         this.moduleInstall = null;
         this.licenseFile = null;
@@ -70,18 +91,48 @@ public final class NbmPluginExtension {
         this.keyStore = new NbmKeyStoreDef();
         this.requires = new LinkedList<>();
         this.classpathExtFolder = null;
-        this.autoupdateShowInClient = project.getObjects().property(Boolean.class);
+        this.autoupdateShowInClient = objects.property(Boolean.class);
 
-        this.distribution = project.getObjects().property(String.class);
-        distribution.convention(project.provider(() -> getModuleName().replace('.', '-') + ".nbm"));
+        this.distribution = objects.property(String.class);
+        distribution.convention(providers.provider(() -> getModuleName().replace('.', '-') + ".nbm"));
 
-        // Initializse default values
-        this.buildDate = new SimpleDateFormat("yyyyMMddHHmmss").format(new Date(System.currentTimeMillis()));
         requires("org.openide.modules.ModuleFormat1");
     }
 
-    public String getBuildDate() {
-        return buildDate;
+    public Property<String> getSpecificationVersion() {
+        return specificationVersion;
+    }
+
+    public void setSpecificationVersion(String specificationVersion) {
+        this.specificationVersion.set(specificationVersion);
+    }
+
+    public void setSpecificationVersion(Provider<? extends String> specificationVersionProvider) {
+        this.specificationVersion.set(specificationVersionProvider);
+    }
+
+    public Property getImplementationVersion() {
+        return implementationVersion;
+    }
+
+    public void setImplementationVersion(String implementationVersion) {
+        this.implementationVersion.set(implementationVersion);
+    }
+
+    public void setImplementationVersion(Provider<? extends String> implementationVersionProvider) {
+        this.implementationVersion.set(implementationVersionProvider);
+    }
+
+    public Property<String> getBuildVersion() {
+        return buildVersion;
+    }
+
+    public void setBuildVersion(Provider<String> buildVersionProvider) {
+        this.buildVersion.set(buildVersionProvider);
+    }
+
+    public void setBuildVersion(String buildVersion) {
+        this.buildVersion.set(buildVersion);
     }
 
     @Deprecated
@@ -227,25 +278,6 @@ public final class NbmPluginExtension {
         this.cluster = cluster;
     }
 
-    public String getSpecificationVersion() {
-        if (specificationVersion == null) {
-            return EvaluateUtils.asString(project.getVersion());
-        }
-        return specificationVersion;
-    }
-
-    public void setSpecificationVersion(String specificationVersion) {
-        this.specificationVersion = specificationVersion;
-    }
-
-    public String getImplementationVersion() {
-        return implementationVersion;
-    }
-
-    public void setImplementationVersion(String implementationVersion) {
-        this.implementationVersion = implementationVersion;
-    }
-
     public boolean isEager() {
         return eager;
     }
@@ -296,5 +328,12 @@ public final class NbmPluginExtension {
 
     public void setClasspathExtFolder(String classpathExtFolder) {
         this.classpathExtFolder = classpathExtFolder;
+    }
+
+    private synchronized Instant getBuildTimestamp() {
+        if (buildTimestamp == null) {
+            buildTimestamp = clock.instant();
+        }
+        return buildTimestamp;
     }
 }

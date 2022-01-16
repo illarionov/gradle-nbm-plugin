@@ -116,18 +116,19 @@ nbm {
         null                   | null
     }
 
+    @SuppressWarnings('Indentation')
     def "manifest file with configured implementation version and build version"() {
-
         given: "Build file with configured nbm plugin"
-        // Set the moduleName because I have no idea what the project's name is,
-        // so can't rely on the default value for that
+        def implementationParam = implementationVersion != null ? "implementationVersion = '$implementationVersion'" : ''
+        def buildParam = buildVersion != null ? "buildVersion = '$buildVersion'" : ''
         buildFile << \
 """
 apply plugin: org.gradle.plugins.nbm.NbmPlugin
 version = '3.5.6'
 nbm {
   moduleName = 'my.test.project'
-  implementationVersion = 'myImplVersion'
+  $implementationParam
+  $buildParam
 }
 """
         when: "Generate netbeans module manifest"
@@ -136,37 +137,31 @@ nbm {
         then: "Default manifest entries exist with correct values."
         def manifest = checkDefaultModuleManifest()
 
-        then: "Entry 'OpenIDE-Module-Implementation-Version' exist in manifest with correct value."
-        assert manifest.get('OpenIDE-Module-Implementation-Version') == 'myImplVersion'
+        then: "Entry 'OpenIDE-Module-Implementation-Version' is $expectedImplementationVersion."
+        if (expectedImplementationVersion != null) {
+            assert manifest.get('OpenIDE-Module-Implementation-Version') =~ expectedImplementationVersion
+        } else {
+            assert !manifest.containsKey('OpenIDE-Module-Implementation-Version')
+        }
 
-        then: "Entry 'OpenIDE-Module-Build-Version' exist in manifest with correct value."
-        assert manifest.get('OpenIDE-Module-Build-Version') =~ /\d{12}/
-    }
+        then: "Entry 'OpenIDE-Module-Build-Versionn' is $expectedBuildVersion."
+        if (expectedBuildVersion != null) {
+            assert manifest.get('OpenIDE-Module-Build-Version') =~ expectedBuildVersion
+        } else {
+            assert !manifest.containsKey('OpenIDE-Module-Build-Version')
+        }
 
-    def "manifest file with default implementation version and no build versions"() {
-
-        given: "Build file with configured nbm plugin"
-        // Set the moduleName because I have no idea what the project's name is,
-        // so can't rely on the default value for that
-        buildFile << \
-"""
-apply plugin: org.gradle.plugins.nbm.NbmPlugin
-version = '3.5.6'
-nbm {
-  moduleName = 'my.test.project'
-}
-"""
-        when: "Generate netbeans module manifest"
-        runTasks 'generateModuleManifest'
-
-        then: "Default manifest entries exist with correct values."
-        def manifest = checkDefaultModuleManifest()
-
-        then: "Entry 'OpenIDE-Module-Implementation-Version' exists in manifest with correct value. (timestamp)"
-        assert manifest.get('OpenIDE-Module-Implementation-Version') =~ /\d{12}/
-
-        then: "Entry 'OpenIDE-Module-Build-Version' does not exist in manifest"
-        assert !manifest.containsKey('OpenIDE-Module-Build-Version')
+        where:
+        implementationVersion | buildVersion || expectedImplementationVersion | expectedBuildVersion
+        null                  | null         || /\d{12}/                      | null
+        null                  | ''           || null                          | null
+        null                  | 'myBuild'    || /myBuild/                     | null            // XXX
+        'myImplVersion'       | null         || /myImplVersion/               | /\d{12}/
+        'myImplVersion'       | ''           || /myImplVersion/               | null
+        'myImplVersion'       | 'myBuild'    || /myImplVersion/               | /myBuild/
+        ''                    | null         || null                          | /\d{12}/
+        ''                    | ''           || null                          | null
+        ''                    | 'myBuild'    || null                          | /myBuild/
     }
 
     def "public packages are added to manifest for sub packages"() {

@@ -16,6 +16,7 @@ import org.gradle.api.tasks.compile.JavaCompile
 
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.Clock
 import java.util.concurrent.Callable
 
 public class NbmPlugin implements Plugin<Project> {
@@ -163,7 +164,7 @@ public class NbmPlugin implements Plugin<Project> {
     private configure(Project project) {
         project.logger.info "Configuring NBM plugin..."
 
-        project.extensions.nbm = new NbmPluginExtension(project)
+        project.extensions.nbm = new NbmPluginExtension(project, Clock.systemUTC())
         setupPropertiesMerging(project)
     }
 

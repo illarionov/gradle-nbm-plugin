@@ -112,6 +112,6 @@ public class NbmPluginTest {
         Project project = ProjectBuilder.builder().withName('my-test-project').build()
         project.project.plugins.apply(NbmPlugin)
 
-        assertNull(project.nbm.implementationVersion)
+        assertNull(project.nbm.implementationVersion.getOrNull())
     }
 }

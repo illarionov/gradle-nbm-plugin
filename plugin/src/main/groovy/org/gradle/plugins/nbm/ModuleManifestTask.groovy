@@ -100,14 +100,22 @@ class ModuleManifestTask extends ConventionTask {
 
         result.put('OpenIDE-Module', netbeansExt().moduleName)
 
-        def implVersion = netbeansExt().implementationVersion
-        if (implVersion) {
-            result.put('OpenIDE-Module-Implementation-Version', implVersion)
-            result.put('OpenIDE-Module-Build-Version', netbeansExt().buildDate)
-        } else {
-            result.put('OpenIDE-Module-Implementation-Version', netbeansExt().buildDate)
+        String buildVersion = netbeansExt().buildVersion.get()
+        String implVersion = netbeansExt().implementationVersion.getOrNull()
+        if (implVersion == null) {
+            implVersion = buildVersion
+            buildVersion = null
         }
-        result.put('OpenIDE-Module-Specification-Version', netbeansExt().specificationVersion)
+
+        if (implVersion != null && !implVersion.isBlank()) {
+            result.put('OpenIDE-Module-Implementation-Version', implVersion)
+        }
+
+        if (buildVersion != null && !buildVersion.isBlank()) {
+            result.put('OpenIDE-Module-Build-Version', buildVersion)
+        }
+
+        result.put('OpenIDE-Module-Specification-Version', netbeansExt().specificationVersion.get())
 
         SortedSet<String> publicPackages = netbeansExt().publicPackages.entries
         if (!publicPackages.isEmpty()) {
