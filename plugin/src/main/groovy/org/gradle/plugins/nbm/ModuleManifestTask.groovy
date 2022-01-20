@@ -19,9 +19,6 @@ import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 
-import javax.inject.Inject
-
-import java.nio.file.Files
 import java.util.jar.Attributes
 import java.util.jar.JarFile
 import java.util.jar.Manifest
@@ -31,11 +28,6 @@ import static java.util.Collections.emptySet
 abstract class ModuleManifestTask extends ConventionTask {
 
     private ModuleManifestConfig moduleManifestConfig
-
-    @Inject
-    ModuleManifestTask() {
-        outputs.upToDateWhen { checkUpToDate() }
-    }
 
     @OutputFile
     abstract Property<File> getGeneratedManifestFile()
@@ -67,49 +59,6 @@ abstract class ModuleManifestTask extends ConventionTask {
     @InputFiles
     @PathSensitive(PathSensitivity.RELATIVE)
     abstract Property<Configuration> getBundleConfiguration()
-
-    public boolean checkUpToDate() {
-        byte[] actualBytes = tryGetCurrentGeneratedContent()
-        if (actualBytes == null) {
-            return false
-        }
-
-        Manifest oldMf = new Manifest(new ByteArrayInputStream(actualBytes));
-        Manifest mf = createManifest()
-
-        Attributes oldAttribs = oldMf.getMainAttributes()
-        Attributes mfAttribs = mf.getMainAttributes()
-
-        // Remove dynamic (time) related content
-        // TODO Ensure values are conform to SimpleDateFormat of NbmPluginExtension.buildDate
-        def attrImplVersion = new Attributes.Name('OpenIDE-Module-Implementation-Version')
-        def attrBuildVersion = new Attributes.Name('OpenIDE-Module-Build-Version')
-        if (oldAttribs.containsKey(attrBuildVersion) && mfAttribs.containsKey(attrBuildVersion)) {
-            logger.debug "UP-TO-DATE check - exclude dynamic manifest values: build version found ->  assume dynamic build version (time stamp) -> include implementation version in check (exclude build version)"
-            oldAttribs.remove(attrBuildVersion)
-            mfAttribs.remove(attrBuildVersion)
-        } else if (!oldAttribs.containsKey(attrBuildVersion) && !mfAttribs.containsKey(attrBuildVersion)) {
-            logger.debug "UP-TO-DATE check - exclude dynamic manifest values: no build version found -> assume dynamic implementation version (time stamp) -> exclude implementation version in check"
-
-            oldAttribs.remove(attrImplVersion)
-            mfAttribs.remove(attrImplVersion)
-        }
-
-        return oldMf == mf
-    }
-
-    private byte[] tryGetCurrentGeneratedContent() {
-        def manifestFile = getGeneratedManifestFile().get().toPath()
-        if (!Files.isRegularFile(manifestFile)) {
-            return null
-        }
-
-        try {
-            return Files.readAllBytes(manifestFile)
-        } catch (IOException ex) {
-            return null;
-        }
-    }
 
     private Map<String, String> getManifestEntries() {
         Map<String, String> result = new LinkedHashMap<>()
