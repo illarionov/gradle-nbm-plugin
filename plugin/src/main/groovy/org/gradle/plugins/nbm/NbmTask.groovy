@@ -2,10 +2,10 @@ package org.gradle.plugins.nbm
 
 import org.apache.tools.ant.taskdefs.Taskdef
 import org.apache.tools.ant.types.Path
+import org.gradle.api.DefaultTask
 import org.gradle.api.artifacts.Configuration
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFile
-import org.gradle.api.internal.ConventionTask
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Classpath
@@ -16,7 +16,7 @@ import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
 
-abstract class NbmTask extends ConventionTask {
+abstract class NbmTask extends DefaultTask {
 
     private NetbeansAutoupdateModuleInfoXml autoupdateModuleInfoXml
 

@@ -1,5 +1,6 @@
 package org.gradle.plugins.nbm
 
+import org.gradle.api.DefaultTask
 import org.gradle.api.InvalidUserDataException
 import org.gradle.api.artifacts.Configuration
 import org.gradle.api.artifacts.ResolvedArtifact
@@ -7,7 +8,7 @@ import org.gradle.api.artifacts.ResolvedDependency
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.FileCollection
 import org.gradle.api.file.FileVisitDetails
-import org.gradle.api.internal.ConventionTask
+import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.Input
@@ -25,12 +26,12 @@ import java.util.jar.Manifest
 
 import static java.util.Collections.emptySet
 
-abstract class ModuleManifestTask extends ConventionTask {
+abstract class ModuleManifestTask extends DefaultTask {
 
     private ModuleManifestConfig moduleManifestConfig
 
     @OutputFile
-    abstract Property<File> getGeneratedManifestFile()
+    abstract RegularFileProperty getGeneratedManifestFile()
 
     @Nested
     ModuleManifestConfig getManifestConfig() {
@@ -201,7 +202,7 @@ abstract class ModuleManifestTask extends ConventionTask {
 
     @TaskAction
     void generate() {
-        def manifestFile = getGeneratedManifestFile().get()
+        def manifestFile = getGeneratedManifestFile().get().asFile
         logger.info "Generating NetBeans module manifest $manifestFile"
 
         def os = new FileOutputStream(manifestFile)

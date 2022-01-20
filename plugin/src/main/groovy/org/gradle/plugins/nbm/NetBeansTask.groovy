@@ -3,6 +3,7 @@ package org.gradle.plugins.nbm
 import org.apache.tools.ant.taskdefs.Taskdef
 import org.apache.tools.ant.types.FileSet
 import org.apache.tools.ant.types.Path
+import org.gradle.api.DefaultTask
 import org.gradle.api.artifacts.Configuration
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.CopySpec
@@ -10,7 +11,6 @@ import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.FileSystemOperations
 import org.gradle.api.file.FileTreeElement
 import org.gradle.api.file.RegularFileProperty
-import org.gradle.api.internal.ConventionTask
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.Input
@@ -27,7 +27,7 @@ import javax.inject.Inject
 import java.util.jar.Attributes
 import java.util.jar.JarFile
 
-abstract class NetBeansTask extends ConventionTask {
+abstract class NetBeansTask extends DefaultTask {
     public static final String TEST_USER_DIR_NAME = 'testuserdir'
 
     private final FileSystemOperations fileOperations;

@@ -4,6 +4,8 @@ import groovy.lang.Closure;
 import org.gradle.api.InvalidUserDataException;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
+import org.gradle.api.file.Directory;
+import org.gradle.api.file.DirectoryProperty;
 import org.gradle.api.file.RegularFile;
 import org.gradle.api.file.RegularFileProperty;
 import org.gradle.api.model.ObjectFactory;
@@ -57,6 +59,10 @@ public class NbmPluginExtension {
     private final Property<Boolean> generateLastModifiedFile;
     private final Provider<Long> lastModifiedTimestampProvider;
 
+    private final DirectoryProperty nbmBuildDir;
+    private final DirectoryProperty nbmModuleBuildDir;
+    private final RegularFileProperty generatedManifestFile;
+
     private final Clock clock;
     private Instant buildTimestamp;
 
@@ -105,6 +111,13 @@ public class NbmPluginExtension {
 
         this.generateLastModifiedFile = objects.property(Boolean.class).convention(true);
         this.lastModifiedTimestampProvider = providers.provider(() -> getBuildTimestamp().toEpochMilli());
+
+        this.nbmBuildDir = objects.directoryProperty().convention(project.getLayout().getBuildDirectory().dir("nbm"));
+        this.nbmModuleBuildDir = objects.directoryProperty()
+            .convention(project.getLayout().getBuildDirectory().dir("module"));
+
+        this.generatedManifestFile = objects.fileProperty()
+            .convention(project.getLayout().getBuildDirectory().file("generated-manifest.mf"));
 
         requires("org.openide.modules.ModuleFormat1");
     }
@@ -426,6 +439,54 @@ public class NbmPluginExtension {
     Provider<Long> getLastModifiedTimestampProvider() {
         return project.getProviders().zip(generateLastModifiedFile, lastModifiedTimestampProvider,
             (enabled, timestamp) -> enabled ? timestamp : 0);
+    }
+
+    public Provider<Directory> getNbmBuildDir() {
+        return nbmBuildDir;
+    }
+
+    public void setNbmBuildDir(File directory) {
+        nbmBuildDir.set(directory);
+    }
+
+    public void setNbmBuildDir(Directory directory) {
+        nbmBuildDir.set(directory);
+    }
+
+    public void setNbmBuildDir(Provider<? extends Directory> directoryProvider) {
+        nbmBuildDir.set(directoryProvider);
+    }
+
+    public Provider<Directory> getNbmModuleBuildDir() {
+        return nbmModuleBuildDir;
+    }
+
+    public void setNbmModuleBuildDir(File directory) {
+        nbmModuleBuildDir.set(directory);
+    }
+
+    public void setNbmModuleBuildDir(Directory directory) {
+        nbmModuleBuildDir.set(directory);
+    }
+
+    public void setNbmModuleBuildDir(Provider<? extends Directory> directoryProvider) {
+        nbmModuleBuildDir.set(directoryProvider);
+    }
+
+    public Provider<RegularFile> getGeneratedManifestFile() {
+        return generatedManifestFile;
+    }
+
+    public void setGeneratedManifestFile(File file) {
+        generatedManifestFile.set(file);
+    }
+
+    public void setGeneratedManifestFile(RegularFile file) {
+        generatedManifestFile.set(file);
+    }
+
+    public void setGeneratedManifestFile(Provider<? extends RegularFile> file) {
+        generatedManifestFile.set(file);
     }
 
     private synchronized Instant getBuildTimestamp() {

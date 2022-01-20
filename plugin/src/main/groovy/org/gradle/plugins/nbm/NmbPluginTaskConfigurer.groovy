@@ -45,7 +45,6 @@ class NmbPluginTaskConfigurer {
     final FileSystemOperations fileSystemOperations
 
     final NbmPluginExtension nbmExtension
-    final NbmPluginConvention nbmConvention
 
     Configuration provideCompileConfiguration
     Configuration provideRuntimeConfiguration
@@ -65,8 +64,6 @@ class NmbPluginTaskConfigurer {
         this.fileSystemOperations = fileSystemOperations
 
         nbmExtension = project.extensions.create("nbm", NbmPluginExtension, project, Clock.systemUTC())
-        nbmConvention = new NbmPluginConvention(project)
-        project.convention.plugins.nbm = nbmConvention
     }
 
     @SuppressWarnings('UnusedVariable')
@@ -201,7 +198,7 @@ class NmbPluginTaskConfigurer {
                 moduleInstall = nbmExtension.moduleInstall
             }
             task.setModuleManifestConfig(moduleManifestConfig)
-            task.generatedManifestFile.convention(providers.provider { nbmConvention.generatedManifestFile })
+            task.generatedManifestFile = nbmExtension.generatedManifestFile
             task.netbeansClasspathExtFolder = nbmExtension.classpathExtFolder
             task.netbeansClasspath.setFrom providers.provider { getNetbeansClasspath() }
             task.runtimeConfiguration = project.configurations.findByName(project.sourceSets.main.runtimeClasspathConfigurationName)
@@ -233,7 +230,7 @@ class NmbPluginTaskConfigurer {
             setDescription "Generates a NetBeans module directory."
             setGroup BasePlugin.BUILD_GROUP
 
-            moduleBuildDir.convention projectLayout.dir(providers.provider { nbmConvention.moduleBuildDir })
+            moduleBuildDir = nbmExtension.nbmModuleBuildDir
             inputModuleJarFile = jarTaskProvider.flatMap { it.archiveFile }
             classpath.setFrom providers.provider { getNetbeansClasspath() }
             classpathExtFolder = nbmExtension.classpathExtFolder
@@ -252,7 +249,7 @@ class NmbPluginTaskConfigurer {
         TaskProvider<NbmTask> nbmTaskProvider = project.tasks.register(NBM_TASK, NbmTask) {
             setGroup BasePlugin.BUILD_GROUP
 
-            nbmBuildDir.convention projectLayout.dir(providers.provider { nbmConvention.nbmBuildDir })
+            nbmBuildDir = nbmExtension.nbmBuildDir
             outputFileName.convention nbmExtension.moduleName.map {
                 it.replace('.', '-') + '.nbm'
             }
