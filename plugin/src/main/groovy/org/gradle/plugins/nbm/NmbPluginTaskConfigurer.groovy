@@ -249,10 +249,8 @@ class NmbPluginTaskConfigurer {
         TaskProvider<NbmTask> nbmTaskProvider = project.tasks.register(NBM_TASK, NbmTask) {
             setGroup BasePlugin.BUILD_GROUP
 
-            nbmBuildDir = nbmExtension.nbmBuildDir
-            outputFileName.convention nbmExtension.moduleName.map {
-                it.replace('.', '-') + '.nbm'
-            }
+            destinationDirectory = nbmExtension.nbmBuildDir
+            archiveFileName = nbmExtension.archiveFileName
             moduleBuildDir = netbeansTaskProvider.flatMap { it.moduleBuildDir }
             it.moduleJarFileName = moduleJarFilename
 

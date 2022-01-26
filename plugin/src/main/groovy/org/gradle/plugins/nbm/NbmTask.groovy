@@ -23,10 +23,10 @@ abstract class NbmTask extends DefaultTask {
     private NbmKeyStoreDef keyStore
 
     @OutputDirectory
-    abstract DirectoryProperty getNbmBuildDir()
+    abstract DirectoryProperty getDestinationDirectory()
 
     @Input
-    abstract Property<String> getOutputFileName()
+    abstract Property<String> getArchiveFileName()
 
     @InputFiles
     abstract DirectoryProperty getModuleBuildDir()
@@ -56,23 +56,23 @@ abstract class NbmTask extends DefaultTask {
     }
 
     @OutputFile
-    Provider<RegularFile> getOutputFile() {
-        return getNbmBuildDir().flatMap {
-            return it.file(getOutputFileName())
+    Provider<RegularFile> getArchiveFile() {
+        return getDestinationDirectory().flatMap {
+            return it.file(getArchiveFileName())
         }
     }
 
     @TaskAction
     void generate() {
-        def nbmFile = getOutputFile().get().asFile
-        def nbmDir = getNbmBuildDir().get().asFile
-        if (!nbmDir.isDirectory()) {
-            nbmDir.mkdirs()
+        def archiveFile = getArchiveFile().get().asFile
+        def destinationDirectory = getDestinationDirectory().get().asFile
+        if (!destinationDirectory.isDirectory()) {
+            destinationDirectory.mkdirs()
         }
 
         def makenbm = antBuilder().antProject.createTask("makenbm")
         makenbm.productDir = getModuleBuildDir().get().asFile
-        makenbm.file = nbmFile
+        makenbm.file = archiveFile
         makenbm.module = "modules" + File.separator + getModuleJarFileName().get()
 
         RegularFile licenseFile = autoupdateModuleInfoXml.licenseFile.getOrNull()

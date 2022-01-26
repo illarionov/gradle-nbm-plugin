@@ -59,6 +59,7 @@ public class NbmPluginExtension {
     private final Property<Boolean> generateLastModifiedFile;
     private final Provider<Long> lastModifiedTimestampProvider;
 
+    private final Property<String> archiveFileName;
     private final DirectoryProperty nbmBuildDir;
     private final DirectoryProperty nbmModuleBuildDir;
     private final RegularFileProperty generatedManifestFile;
@@ -106,8 +107,12 @@ public class NbmPluginExtension {
         this.classpathExtFolder = objects.property(String.class);
         this.autoupdateShowInClient = objects.property(Boolean.class);
 
+        this.archiveFileName = objects.property(String.class).convention(getModuleName().map(name -> {
+            return name.replace('.', '-') + ".nbm";
+        }));
+
         this.distribution = objects.property(String.class);
-        distribution.convention(providers.provider(() -> getModuleName().get().replace('.', '-') + ".nbm"));
+        distribution.convention(archiveFileName);
 
         this.generateLastModifiedFile = objects.property(Boolean.class).convention(true);
         this.lastModifiedTimestampProvider = providers.provider(() -> getBuildTimestamp().toEpochMilli());
@@ -439,6 +444,18 @@ public class NbmPluginExtension {
     Provider<Long> getLastModifiedTimestampProvider() {
         return project.getProviders().zip(generateLastModifiedFile, lastModifiedTimestampProvider,
             (enabled, timestamp) -> enabled ? timestamp : 0);
+    }
+
+    public Provider<String> getArchiveFileName() {
+        return archiveFileName;
+    }
+
+    public void setArchiveFileName(String archiveFileName) {
+        this.archiveFileName.set(archiveFileName);
+    }
+
+    public void setArchiveFileName(Provider<String> archiveFileNameProvider) {
+        this.archiveFileName.set(archiveFileNameProvider);
     }
 
     public Provider<Directory> getNbmBuildDir() {
