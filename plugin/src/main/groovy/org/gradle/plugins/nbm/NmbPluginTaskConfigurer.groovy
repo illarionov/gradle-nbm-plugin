@@ -4,12 +4,19 @@ import groovy.transform.PackageScope
 import org.gradle.api.Project
 import org.gradle.api.artifacts.Configuration
 import org.gradle.api.artifacts.ConfigurationContainer
+import org.gradle.api.artifacts.ConfigurationPublications
+import org.gradle.api.attributes.Bundling
+import org.gradle.api.attributes.Category
+import org.gradle.api.attributes.LibraryElements
+import org.gradle.api.attributes.Usage
+import org.gradle.api.component.AdhocComponentWithVariants
 import org.gradle.api.file.FileCollection
 import org.gradle.api.file.FileSystemOperations
 import org.gradle.api.file.FileTreeElement
 import org.gradle.api.file.ProjectLayout
 import org.gradle.api.model.ObjectFactory
 import org.gradle.api.plugins.BasePlugin
+import org.gradle.api.plugins.JavaLibraryPlugin
 import org.gradle.api.plugins.JavaPlugin
 import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.api.provider.Provider
@@ -28,13 +35,17 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Clock
 
+import static org.gradle.plugins.nbm.NbmPlugin.API_ELEMENTS_CONFIGURATION_NAME
 import static org.gradle.plugins.nbm.NbmPlugin.BUNDLE_CONFIGURATION_NAME
 import static org.gradle.plugins.nbm.NbmPlugin.IMPLEMENTATION_CONFIGURATION_NAME
 import static org.gradle.plugins.nbm.NbmPlugin.MANIFEST_TASK
+import static org.gradle.plugins.nbm.NbmPlugin.NBM_ARTIFACT_TYPE
+import static org.gradle.plugins.nbm.NbmPlugin.NBM_LIBRARY_ELEMENTS
 import static org.gradle.plugins.nbm.NbmPlugin.NBM_TASK
 import static org.gradle.plugins.nbm.NbmPlugin.NETBEANS_TASK
 import static org.gradle.plugins.nbm.NbmPlugin.PROVIDED_COMPILE_CONFIGURATION_NAME
 import static org.gradle.plugins.nbm.NbmPlugin.PROVIDED_RUNTIME_CONFIGURATION_NAME
+import static org.gradle.plugins.nbm.NbmPlugin.RUNTIME_ELEMENTS_CONFIGURATION_NAME
 
 @PackageScope
 class NmbPluginTaskConfigurer {
@@ -50,6 +61,8 @@ class NmbPluginTaskConfigurer {
     Configuration provideRuntimeConfiguration
     Configuration implementationConfiguration
     Configuration bundleConfiguration
+    Configuration runtimeElementsConfiguration
+    Configuration apiElementsConfiguration
 
     @Inject
     NmbPluginTaskConfigurer(Project project,
@@ -81,6 +94,8 @@ class NmbPluginTaskConfigurer {
         TaskProvider<NetBeansTask> netbeansTaskProvider = setupNetbeansTask(jarTaskProvider, moduleJarFilename)
         TaskProvider<NbmTask> nbmTaskProvider = setupNbmTask(netbeansTaskProvider, moduleJarFilename)
 
+        configureComponent(nbmTaskProvider)
+
         project.tasks.named("assemble").configure {
             dependsOn nbmTaskProvider
         }
@@ -104,6 +119,35 @@ class NmbPluginTaskConfigurer {
         bundleConfiguration = container.create(BUNDLE_CONFIGURATION_NAME)
             .setVisible(false)
             .setDescription("NBM module's dependencies on OSGi bundles");
+        runtimeElementsConfiguration = container.create(RUNTIME_ELEMENTS_CONFIGURATION_NAME).tap {
+            visible = false
+            description = "NBM module's elements of runtime"
+            canBeConsumed = true
+            canBeResolved = false
+            extendsFrom(provideRuntimeConfiguration, implementationConfiguration, bundleConfiguration)
+            attributes {
+                attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage, Usage.JAVA_RUNTIME))
+                attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category, Category.LIBRARY))
+                attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements, NBM_LIBRARY_ELEMENTS))
+                attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling, Bundling.EXTERNAL))
+            }
+        }
+        apiElementsConfiguration = container.create(API_ELEMENTS_CONFIGURATION_NAME).tap {
+            visible = false
+            description = "NBM module's API elements"
+            canBeConsumed = true
+            canBeResolved = false
+            attributes {
+                attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage, Usage.JAVA_API))
+                attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category, Category.LIBRARY))
+                attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements, NBM_LIBRARY_ELEMENTS))
+                attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling, Bundling.EXTERNAL))
+            }
+        }
+        project.plugins.withType(JavaLibraryPlugin) {
+            apiElementsConfiguration.extendsFrom(container.getByName(JavaPlugin.API_CONFIGURATION_NAME))
+            apiElementsConfiguration.extendsFrom(container.getByName(JavaPlugin.COMPILE_ONLY_API_CONFIGURATION_NAME))
+        }
 
         container.getByName(JavaPlugin.IMPLEMENTATION_CONFIGURATION_NAME)
             .extendsFrom(provideCompileConfiguration)
@@ -267,6 +311,27 @@ class NmbPluginTaskConfigurer {
         }
 
         return nbmTaskProvider
+    }
+
+    void configureComponent(TaskProvider<NbmTask> nbmTaskTaskProvider) {
+        ConfigurationPublications runtimePublications = runtimeElementsConfiguration.getOutgoing()
+        runtimePublications.artifact(nbmTaskTaskProvider.flatMap { it.archiveFile }) {
+            type = NBM_ARTIFACT_TYPE
+            builtBy nbmTaskTaskProvider
+        }
+        ConfigurationPublications apiPublications = apiElementsConfiguration.getOutgoing()
+        apiPublications.artifact(nbmTaskTaskProvider.flatMap { it.archiveFile }) {
+            type = NBM_ARTIFACT_TYPE
+            builtBy nbmTaskTaskProvider
+        }
+
+        AdhocComponentWithVariants javaComponent = (AdhocComponentWithVariants) project.components.findByName('java')
+        javaComponent.addVariantsFromConfiguration(runtimeElementsConfiguration) {
+            it.mapToMavenScope("runtime")
+        }
+        javaComponent.addVariantsFromConfiguration(apiElementsConfiguration) {
+            it.mapToMavenScope("compile")
+        }
     }
 
     void addRunTask(TaskProvider<NetBeansTask> netBeansTask,  String taskName, boolean debug) {
