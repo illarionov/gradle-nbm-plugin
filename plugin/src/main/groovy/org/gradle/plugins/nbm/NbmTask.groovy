@@ -2,6 +2,7 @@ package org.gradle.plugins.nbm
 
 import org.apache.tools.ant.taskdefs.Taskdef
 import org.apache.tools.ant.types.Path
+import org.gradle.api.AntBuilder
 import org.gradle.api.DefaultTask
 import org.gradle.api.artifacts.Configuration
 import org.gradle.api.file.DirectoryProperty

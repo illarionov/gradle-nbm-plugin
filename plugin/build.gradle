@@ -4,7 +4,7 @@ apply plugin: 'java'
 apply plugin: 'idea'
 apply plugin: 'maven-publish'
 apply plugin: 'java-gradle-plugin'
-apply plugin: "nebula.release"
+apply plugin: "com.netflix.nebula.release"
 apply plugin: "com.diffplug.spotless"
 apply plugin: 'codenarc'
 
@@ -18,12 +18,12 @@ rootProject.tasks.release.dependsOn tasks.publish
 
 // custom tasks for creating source/javadoc jars
 task sourcesJar(type: Jar, dependsOn: classes) {
-    classifier = 'sources'
+    archiveClassifier = 'sources'
     from sourceSets.main.allSource
 }
 
 task javadocJar(type: Jar, dependsOn: javadoc) {
-    classifier = 'javadoc'
+    archiveClassifier = 'javadoc'
     from javadoc.destinationDir
 }
 
@@ -48,17 +48,17 @@ dependencies {
     implementation localGroovy()
     implementation "org.codehaus.mojo:nbm-maven-harness:8.2"
 
-    testImplementation "org.junit.jupiter:junit-jupiter-api:5.8.2"
-    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:5.8.2"
+    testImplementation "org.junit.jupiter:junit-jupiter-api:5.10.0"
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:5.10.0"
 
-    testImplementation "org.spockframework:spock-core:2.0-groovy-3.0", {
+    testImplementation "org.spockframework:spock-core:2.3-groovy-3.0", {
         exclude module: "groovy-all"
     }
     testImplementation 'org.hamcrest:hamcrest:2.2'
     testImplementation group: 'xml-resolver', name: 'xml-resolver', version: '1.2'
 
-    codenarc "org.codenarc:CodeNarc:2.2.0"
-    codenarc "org.codehaus.groovy:groovy-all:3.0.9"
+    codenarc "org.codenarc:CodeNarc:3.3.0"
+    codenarc "org.codehaus.groovy:groovy-all:3.0.18"
 }
 repositories {
     mavenCentral()
@@ -107,10 +107,10 @@ publishing {
             version project.version
 
             from components.java
-            artifact sourcesJar {
+            artifact(sourcesJar) {
                 classifier "sources"
             }
-            artifact javadocJar {
+            artifact(javadocJar) {
                 classifier "javadoc"
             }
         }
@@ -128,7 +128,7 @@ idea.module {
 }
 
 codenarc {
-    toolVersion = '2.2.0'
+    toolVersion = '3.3.0'
     configFile = rootProject.file('gradle/codenarc.groovy')
     reportFormat = 'html'
 }

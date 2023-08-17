@@ -67,6 +67,8 @@ ruleset {
     JavadocMissingExceptionDescription
     JavadocMissingParamDescription
     JavadocMissingThrowsDescription
+    SpaceAfterCommentDelimiter
+    SpaceBeforeCommentDelimiter
 
     // rulesets/concurrency.xml
     BusyWait
@@ -74,6 +76,7 @@ ruleset {
     InconsistentPropertyLocking
     InconsistentPropertySynchronization
     NestedSynchronization
+    NoScriptBindings
     StaticCalendarField
     StaticConnection
     StaticDateFormatField
@@ -305,6 +308,7 @@ ruleset {
     JUnitUnnecessaryTearDown
     JUnitUnnecessaryThrowsException
     SpockIgnoreRestUsed
+    SpockMissingAssert
     UnnecessaryFail
     UseAssertEqualsInsteadOfAssertTrue
     UseAssertFalseInsteadOfNegation
@@ -401,7 +405,6 @@ ruleset {
     // UnnecessarySemicolon
     // UnnecessarySetter
     UnnecessaryStringInstantiation
-    UnnecessarySubstring
     UnnecessaryTernaryExpression
     UnnecessaryToString
     UnnecessaryTransientModifier
